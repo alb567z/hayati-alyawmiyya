@@ -260,6 +260,8 @@ public class MainActivity extends Activity {
             if (saved.length() < 1024) {
                 saved.delete();
                 toast("التسجيل قصير جداً. أعد العينة من فضلك.");
+                enrollmentButton.setText("أعد تسجيل العينة " + enrollmentSample);
+                enrollmentStatus.setText("لم تُحفظ العينة. اضغط لإعادة التسجيل.");
                 return;
             }
         } catch (Exception e) {
