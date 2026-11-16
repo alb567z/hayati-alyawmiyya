@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
     private static final int CONTACT_PERMISSION = 703, CALL_PERMISSION = 704;
     private String pendingContactName = "";
     private boolean pendingSms = false;
+    private String pendingSmsBody = "";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -121,7 +122,7 @@ public class MainActivity extends Activity {
         try {
             if(pendingSms) {
                 Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(number)));
-                i.putExtra("sms_body",""); startActivity(i);
+                i.putExtra("sms_body",pendingSmsBody); startActivity(i);
                 speak("فتحت الرسائل. اكتب رسالتك وراجعها ثم اضغط إرسال.");
             } else {
                 if(checkSelfPermission("android.permission.CALL_PHONE")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -187,9 +188,15 @@ public class MainActivity extends Activity {
         }
         if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {
             String rest=command.replaceFirst("^(ابعث|أرسل|ارسل)\\s*رسالة\\s*(إلى|الى|ل)?\\s*","").trim();
-            int split=rest.indexOf(" ");
-            if(split<1) speak("قولي: ابعث رسالة إلى الاسم ثم نص الرسالة");
-            else requestContactAction(rest.substring(0,split).trim(),true);
+            int split=rest.indexOf(" نصها ");
+            if(split<1) split=rest.indexOf(" نص ");
+            if(split<1) speak("قولي: ابعث رسالة إلى عبد الباري نصها السلام عليكم");
+            else {
+                String person=rest.substring(0,split).trim();
+                String body=rest.substring(split).replaceFirst("^\\s*نصها?\\s*","").trim();
+                requestContactAction(person,true);
+                pendingSmsBody=body;
+            }
             return;
         }
         if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ")) {
