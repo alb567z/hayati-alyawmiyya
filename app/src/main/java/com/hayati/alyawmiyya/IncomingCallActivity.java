@@ -9,9 +9,11 @@ import android.view.Gravity;
 import android.view.WindowManager;
 import android.widget.*;
 import android.graphics.Color;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import java.util.*;
 public class IncomingCallActivity extends Activity {
- private TextToSpeech tts; private TextView status; private String title="موعد العمل"; private boolean answered=false;
+ private TextToSpeech tts; private Ringtone ringtone; private TextView status; private String title="موعد العمل"; private boolean answered=false;
  private static final int SPEECH=441;
  @Override public void onCreate(Bundle state){
   super.onCreate(state);
@@ -26,11 +28,11 @@ public class IncomingCallActivity extends Activity {
   status=new TextView(this);status.setText("اتصال وارد");status.setTextColor(Color.WHITE);status.setTextSize(16);status.setGravity(Gravity.CENTER);root.addView(status);
   Button answer=new Button(this);answer.setText("📞 الرد على نسرين");answer.setAllCaps(false);root.addView(answer);
   Button decline=new Button(this);decline.setText("إنهاء الاتصال");decline.setAllCaps(false);root.addView(decline);
-  setContentView(root);tts=new TextToSpeech(this,s->{if(s==TextToSpeech.SUCCESS){tts.setLanguage(new Locale("ar","LY"));android.content.SharedPreferences p=getSharedPreferences("hayati_data",MODE_PRIVATE);tts.setPitch(p.getFloat("voice_pitch",1.0f));}});
+  setContentView(root);try{android.net.Uri ring=RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);if(ring!=null){ringtone=RingtoneManager.getRingtone(this,ring);if(ringtone!=null)ringtone.play();}}catch(Exception ignored){}tts=new TextToSpeech(this,s->{if(s==TextToSpeech.SUCCESS){tts.setLanguage(new Locale("ar","LY"));android.content.SharedPreferences p=getSharedPreferences("hayati_data",MODE_PRIVATE);tts.setPitch(p.getFloat("voice_pitch",1.0f));}});
   answer.setOnClickListener(v->answerCall(root));decline.setOnClickListener(v->finish());
  }
  private void answerCall(LinearLayout root){
-  if(answered)return;answered=true;status.setText("المكالمة متصلة — اضغط تحدث ورد عليّ");
+  if(answered)return;answered=true;if(ringtone!=null){try{ringtone.stop();}catch(Exception ignored){}}status.setText("المكالمة متصلة — اضغط تحدث ورد عليّ");
   say("صباح الخير يا صاحبي. نذكرك بموعد العمل: "+title+". كيف أمورك؟ هل أنت جاهز؟");
   Button talk=new Button(this);talk.setText("🎙️ تحدث مع نسرين");talk.setAllCaps(false);root.addView(talk);talk.setOnClickListener(v->listen());
  }
@@ -51,5 +53,5 @@ public class IncomingCallActivity extends Activity {
   status.setText("متصلة — آخر كلامك: "+heard);say(response);
  }
  private void say(String message){if(tts!=null)tts.speak(message,TextToSpeech.QUEUE_FLUSH,null,"work-call-"+System.currentTimeMillis());else if(status!=null)status.setText(message);}
- @Override protected void onDestroy(){if(tts!=null){tts.stop();tts.shutdown();}super.onDestroy();}
+ @Override protected void onDestroy(){if(ringtone!=null){try{ringtone.stop();}catch(Exception ignored){}}if(tts!=null){tts.stop();tts.shutdown();}super.onDestroy();}
 }
