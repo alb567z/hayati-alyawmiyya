@@ -727,6 +727,23 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (lower.contains("ملاحظ") && (lower.contains("شن") || lower.contains("عندي") || lower.contains("اقرا") || lower.contains("اقرأ"))) {
+            speakSavedItems("notes", false);
+            showTab("notes");
+            return;
+        }
+        if ((lower.contains("مهم") || lower.contains("حاجات بندير")) && (lower.contains("شن") || lower.contains("عندي") || lower.contains("اقرا") || lower.contains("اقرأ"))) {
+            speakSavedItems("tasks", false);
+            showTab("tasks");
+            return;
+        }
+        if ((lower.contains("موعد") || lower.contains("مواعيد") || lower.contains("تذكير")) && (lower.contains("شن") || lower.contains("عندي") || lower.contains("غدوة") || lower.contains("بكره") || lower.contains("بكرة") || lower.contains("غدا"))) {
+            boolean tomorrow = lower.contains("غدوة") || lower.contains("بكره") || lower.contains("بكرة") || lower.contains("غدا");
+            speakSavedItems("reminders", tomorrow);
+            showTab("reminders");
+            return;
+        }
+
         if (lower.matches(".*(?:افتح|اعرض|وريني|ورني|شن عندي|شنو عندي).*")) {
             if (lower.contains("مهم")) { showTab("tasks"); speak("هذي مهامك."); return; }
             if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذي ملاحظاتك."); return; }
@@ -815,6 +832,44 @@ public class MainActivity extends Activity {
         }
 
         speak("ما فهمتكش، عاود قولّي.");
+    }
+
+    private void speakSavedItems(String key, boolean tomorrowOnly) {
+        String today = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(new Date());
+        Calendar target = Calendar.getInstance();
+        if (tomorrowOnly) target.add(Calendar.DAY_OF_YEAR, 1);
+        String date = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(target.getTime());
+        JSONArray source = "tasks".equals(key) ? tasks : "notes".equals(key) ? notes : reminders;
+        ArrayList<String> entries = new ArrayList<>();
+        for (int i = 0; i < source.length(); i++) {
+            JSONObject item = source.optJSONObject(i);
+            if (item == null) continue;
+            String title = item.optString("title", "").trim();
+            if ("tasks".equals(key)) {
+                if (item.optBoolean("done", false) || title.isEmpty()) continue;
+                entries.add(title);
+            } else if ("notes".equals(key)) {
+                String body = item.optString("body", "").trim();
+                String value = body.isEmpty() ? title : (title.isEmpty() ? body : title + ": " + body);
+                if (!value.isEmpty()) entries.add(value);
+            } else {
+                String when = item.optString("when", "");
+                if (tomorrowOnly && !when.startsWith(date)) continue;
+                if (!tomorrowOnly && !when.isEmpty() && !when.startsWith(today)) continue;
+                if (!title.isEmpty()) entries.add(title + (when.length() >= 18 ? " الساعة " + when.substring(12).trim() : ""));
+            }
+        }
+        String label = "tasks".equals(key) ? "مهامك" : "notes".equals(key) ? "ملاحظاتك" : "مواعيدك";
+        if (entries.isEmpty()) {
+            speak("ما عندكش " + label + (tomorrowOnly ? " مسجلة غدوة." : " مسجلة حالياً."));
+            return;
+        }
+        StringBuilder answer = new StringBuilder("عندك " + (tomorrowOnly ? label + " غدوة: " : label + ": "));
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) answer.append("، ");
+            answer.append(entries.get(i));
+        }
+        speak(answer.toString());
     }
 
     private void showTab(String tab) {
