@@ -214,7 +214,7 @@ public class MainActivity extends Activity {
             } else {
                 pendingCallNumber = number;
                 awaitingCallConfirmation = true;
-                speak("هل تريد الاتصال بـ "+pendingContactName+"؟ قل إي اتصل أو لا ألغي.");
+                speak("هل تريد الاتصال بـ "+pendingContactName+"؟ للتأكيد قل إي، أو تمام، أو اتصل. وللإلغاء قل لا.");
                 // Open speech recognition after the spoken confirmation prompt finishes.
                 new Handler(getMainLooper()).postDelayed(() -> {
                     if (awaitingCallConfirmation && !isFinishing()) startVoiceInput();
@@ -552,8 +552,7 @@ public class MainActivity extends Activity {
 
     private void handleCallConfirmationVoice(String raw) {
         String answer = normalizeVoiceText(cleanVoice(raw));
-        boolean yes = answer.matches(".*(?:^|\\s)(?:نعم|اي|ايوه|أيوه|ايوا)(?:\\s|$).*")
-            || answer.contains("نعم اتصل") || answer.contains("اي اتصل") || answer.contains("ايوه اتصل");
+        boolean yes = answer.matches(".*(?:^|\\s)(?:نعم|اي|ايوه|أيوه|ايوا|تمام|اتصل)(?:\\s|$).*");
         boolean no = answer.matches(".*(?:^|\\s)(?:لا|الغاء|الغي|إلغاء)(?:\\s|$).*");
         if (yes && !pendingCallNumber.isEmpty()) {
             String number = pendingCallNumber;
