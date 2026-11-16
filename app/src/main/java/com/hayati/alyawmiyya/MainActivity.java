@@ -230,6 +230,12 @@ public class MainActivity extends Activity {
         String lower = normalizeVoiceText(command);
         if (lower.isEmpty()) { speak("ما فهمتكش، عاود قولّي."); return; }
 
+        // الرد على التحية بدلاً من اعتبارها أمراً غير معروف
+        if (lower.matches(".*(?:السلام عليكم|سلام عليكم|وعليكم السلام|مرحبا|اهلا|أهلا|هلا).*")) {
+            speak("وعليكم السلام ورحمة الله، أهلاً بيك! كيف نقدر نساعدك؟");
+            return;
+        }
+
         if (lower.matches(".*(?:اتصل|كلم|رن على|دق على).*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("الاتصال مقفول من الإعدادات."); return; }
             String person = lower.replaceFirst(".*?(?:اتصل|كلم|رن على|دق على)\\s*(?:ب|على|مع|ل)?\\s*", "").trim();
