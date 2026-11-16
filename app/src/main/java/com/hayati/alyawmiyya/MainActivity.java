@@ -5,6 +5,7 @@ import android.content.*;
 import android.net.Uri;
 import android.database.Cursor;
 import android.provider.ContactsContract;
+import android.provider.Settings;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -67,9 +68,9 @@ public class MainActivity extends Activity {
         setContentView(root);
         LinearLayout header = new LinearLayout(this); header.setPadding(22,22,22,20); header.setGravity(Gravity.CENTER_VERTICAL);
         header.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{Color.rgb(0,105,92), Color.rgb(0,150,136)})); header.setOrientation(LinearLayout.VERTICAL);
-        TextView brand = new TextView(this); brand.setText("حياتي اليومية  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(26); brand.setTypeface(null, android.graphics.Typeface.BOLD); brand.setGravity(Gravity.RIGHT);
+        TextView brand = new TextView(this); brand.setText("صاحبي  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(26); brand.setTypeface(null, android.graphics.Typeface.BOLD); brand.setGravity(Gravity.RIGHT);
         TextView sub = new TextView(this); sub.setText("مساحتك لتنظيم يومك بكل سهولة"); sub.setTextColor(Color.rgb(220,245,240)); sub.setTextSize(14); sub.setGravity(Gravity.RIGHT);
-        header.addView(brand); header.addView(sub); Button voice = new Button(this); voice.setText("🎤 تحدث إلى حياتي اليومية"); voice.setAllCaps(false); voice.setTextSize(15); voice.setTextColor(Color.rgb(0,105,92)); voice.setBackground(roundDrawable(Color.WHITE,18)); voice.setOnClickListener(v -> startVoiceInput()); LinearLayout.LayoutParams voiceLp = new LinearLayout.LayoutParams(-1, -2); voiceLp.topMargin = 12; header.addView(voice, voiceLp); root.addView(header);
+        header.addView(brand); header.addView(sub); Button voice = new Button(this); voice.setText("🎤 تحدث إلى صاحبي"); voice.setAllCaps(false); voice.setTextSize(15); voice.setTextColor(Color.rgb(0,105,92)); voice.setBackground(roundDrawable(Color.WHITE,18)); voice.setOnClickListener(v -> startVoiceInput()); LinearLayout.LayoutParams voiceLp = new LinearLayout.LayoutParams(-1, -2); voiceLp.topMargin = 12; header.addView(voice, voiceLp); root.addView(header);
         ScrollView scroll = new ScrollView(this); content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(16,16,16,22);
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
         nav = new LinearLayout(this); nav.setPadding(4,8,4,8); nav.setBackgroundColor(Color.WHITE); root.addView(nav);
@@ -80,7 +81,7 @@ public class MainActivity extends Activity {
         b.setOnClickListener(v -> showTab(id)); nav.addView(b,new LinearLayout.LayoutParams(0,54,1));
     }
     private void showSettings() {
-        heading("الإعدادات", "تحكم في صلاحيات وميزات حياتي اليومية");
+        heading("الإعدادات", "تحكم في صلاحيات وميزات صاحبي");
         android.content.SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);
         Switch voice=new Switch(this); voice.setText("الردود الصوتية"); voice.setTextSize(17); voice.setChecked(p.getBoolean("voice_enabled",true));
         voice.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("voice_enabled",on).apply()); card(voice);
@@ -95,7 +96,10 @@ public class MainActivity extends Activity {
         content.addView(button("🎙️ إذن الميكروفون",()->openPermissionSettings("android.permission.RECORD_AUDIO")));
         content.addView(button("📇 إذن جهات الاتصال",()->openPermissionSettings("android.permission.READ_CONTACTS")));
         content.addView(button("📞 إذن إجراء المكالمات",()->openPermissionSettings("android.permission.CALL_PHONE")));
-        content.addView(button("🔔 إذن الإشعارات",()->openAppSettings()));
+        content.addView(button("🔔 السماح لصاحبي بمعرفة الإشعارات",()->{
+            try { startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)); }
+            catch(Exception e) { toast("افتح إعدادات الوصول إلى الإشعارات من إعدادات الهاتف."); }
+        }));
         Switch motion=new Switch(this); motion.setText("استشعار حركة الهاتف أثناء فتح التطبيق"); motion.setTextSize(16); motion.setChecked(p.getBoolean("motion_enabled",false));
         motion.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("motion_enabled",on).apply()); card(motion);
         content.addView(button("🎙️ إعداد إذن الميكروفون",()->openAppSettings()));
@@ -291,7 +295,27 @@ public class MainActivity extends Activity {
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = normalizeVoiceText(command);
+        lower = lower.replaceFirst("^(?:يا\\s+)?صاحبي\\s*", "").trim();
         if (lower.isEmpty()) { speak("ما فهمتكش، عاود قولّي."); return; }
+
+        if (lower.contains("كم الساعه") || lower.equals("الساعه") || lower.contains("الوقت توا") || lower.contains("الوقت الان")) {
+            String currentTime = new SimpleDateFormat("HH:mm", new Locale("ar", "LY")).format(new Date());
+            speak("الساعة الآن " + currentTime);
+            return;
+        }
+
+        if (lower.contains("اشعار") || lower.contains("اشعارات")) {
+            if (!NotificationReaderService.hasAccess(this)) {
+                speak("باش نقدر نعرف إشعاراتك، فعّل إذن الوصول للإشعارات من الإعدادات.");
+                try { startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)); } catch(Exception ignored) {}
+                return;
+            }
+            int activeCount = NotificationReaderService.getActiveCount();
+            if (activeCount < 0) speak("صلاحية الإشعارات مفعلة، لكن الخدمة مش جاهزة توا. عاود بعد شوية.");
+            else if (activeCount == 0) speak("لا، ما عندكش إشعارات حالياً.");
+            else speak("إيه، عندك " + activeCount + " إشعارات حالياً.");
+            return;
+        }
 
         // الرد على التحية بدلاً من اعتبارها أمراً غير معروف
         if (lower.matches(".*(?:السلام عليكم|سلام عليكم|وعليكم السلام|مرحبا|اهلا|أهلا|هلا).*")) {
