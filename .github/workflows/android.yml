@@ -31,3 +31,5 @@ jobs:
         with:
           name: Hayati-AlYawmiyya-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
+# Build latest reminder-call alert changes.
