@@ -261,6 +261,35 @@ public class MainActivity extends Activity {
             return;
         }
 
+        // الإجابة عن أسئلة مواعيد اليوم بصيغها الطبيعية باللهجة الليبية
+        if (lower.contains("اليوم") && (lower.contains("موعد") || lower.contains("مواعيد"))) {
+            String today = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(new Date());
+            ArrayList<String> todays = new ArrayList<>();
+            for (int i = 0; i < reminders.length(); i++) {
+                JSONObject item = reminders.optJSONObject(i);
+                if (item == null) continue;
+                String whenText = item.optString("when", "");
+                if (whenText.startsWith(today)) {
+                    String timeText = whenText.length() >= 18 ? whenText.substring(12).trim() : "";
+                    String entry = item.optString("title", "موعد");
+                    if (!timeText.isEmpty()) entry += " الساعة " + timeText;
+                    todays.add(entry);
+                }
+            }
+            if (todays.isEmpty()) {
+                speak("ما عندكش مواعيد مسجلة لليوم.");
+            } else {
+                StringBuilder answer = new StringBuilder("عندك اليوم " + todays.size() + (todays.size() == 1 ? " موعد: " : " مواعيد: "));
+                for (int i = 0; i < todays.size(); i++) {
+                    if (i > 0) answer.append("، ");
+                    answer.append(todays.get(i));
+                }
+                speak(answer.toString());
+            }
+            showTab("reminders");
+            return;
+        }
+
         if (lower.matches(".*(?:افتح|اعرض|وريني|ورني|شن عندي|شنو عندي).*")) {
             if (lower.contains("مهم")) { showTab("tasks"); speak("هذي مهامك."); return; }
             if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذي ملاحظاتك."); return; }
