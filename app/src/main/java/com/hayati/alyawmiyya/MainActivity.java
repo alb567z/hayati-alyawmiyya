@@ -96,10 +96,22 @@ public class MainActivity extends Activity {
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
     }
     private void addNav(String id, String label) {
-        Button b = new Button(this); b.setText(label); b.setTextSize(13); b.setAllCaps(false);
-        b.setMinWidth((int)(84 * getResources().getDisplayMetrics().density));
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(14);
+        b.setTextColor(ink);
+        b.setTypeface(null, android.graphics.Typeface.BOLD);
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setSingleLine(false);
+        b.setPadding(6, 4, 6, 4);
+        b.setBackground(roundDrawable(Color.rgb(238, 246, 244), 12));
+        int width = (int)(100 * getResources().getDisplayMetrics().density);
+        b.setMinWidth(width);
         b.setOnClickListener(v -> showTab(id));
-        nav.addView(b,new LinearLayout.LayoutParams((int)(92 * getResources().getDisplayMetrics().density),54));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(width, (int)(54 * getResources().getDisplayMetrics().density));
+        lp.setMargins(3, 0, 3, 0);
+        nav.addView(b, lp);
     }
     private void showSettings() {
         heading("الإعدادات", "تحكم في صلاحيات وميزات صاحبي");
