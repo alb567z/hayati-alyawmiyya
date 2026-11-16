@@ -141,7 +141,60 @@ public class WakeWordService extends Service {
                 else if(count==0) say("ما عندكش إشعارات ظاهرة توا.");
                 else say("عندك "+count+" إشعار ظاهر توا.");
             }
-        } else say("حالياً نقدر نجاوبك عن الساعة والإشعارات.");
+        } else if (heard.contains("ملاحظ") || heard.contains("مذكرات")) {
+            say(readSavedItems("notes", "ملاحظاتك", false));
+        } else if (heard.contains("مهم") || heard.contains("حاجات بندير") || heard.contains("شن عندي")) {
+            if (heard.contains("موعد") || heard.contains("مواعيد")) say(readSavedItems("reminders", "مواعيدك", heard.contains("غدوة") || heard.contains("بكره") || heard.contains("بكرة") || heard.contains("غدا")));
+            else if (heard.contains("ملاحظ")) say(readSavedItems("notes", "ملاحظاتك", false));
+            else say(readSavedItems("tasks", "مهامك", false));
+        } else if (heard.contains("موعد") || heard.contains("مواعيد") || heard.contains("تذكير")) {
+            boolean tomorrow = heard.contains("غدوة") || heard.contains("بكره") || heard.contains("بكرة") || heard.contains("غدا");
+            say(readSavedItems("reminders", "مواعيدك", tomorrow));
+        } else say("نقدر نجاوبك عن الساعة والإشعارات والمهام والملاحظات والمواعيد المحفوظة.");
+    }
+
+    private String readSavedItems(String key, String label, boolean tomorrowOnly) {
+        try {
+            String today = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(new Date());
+            Calendar target = Calendar.getInstance();
+            if (tomorrowOnly) target.add(Calendar.DAY_OF_YEAR, 1);
+            String date = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(target.getTime());
+            String raw = getSharedPreferences("hayati_data", MODE_PRIVATE).getString(key, "[]");
+            org.json.JSONArray items = new org.json.JSONArray(raw == null ? "[]" : raw);
+            ArrayList<String> lines = new ArrayList<>();
+            for (int i = 0; i < items.length(); i++) {
+                org.json.JSONObject item = items.optJSONObject(i);
+                if (item == null) continue;
+                String title = item.optString("title", "").trim();
+                if ("notes".equals(key)) {
+                    String body = item.optString("body", "").trim();
+                    if (!body.isEmpty() && !body.equals(title)) title = title.isEmpty() ? body : title + ": " + body;
+                }
+                if ("tasks".equals(key)) {
+                    if (item.optBoolean("done", false) || title.isEmpty()) continue;
+                    lines.add(title);
+                } else if ("notes".equals(key)) {
+                    if (!title.isEmpty()) lines.add(title);
+                } else {
+                    String when = item.optString("when", "");
+                    if (tomorrowOnly && !when.startsWith(date)) continue;
+                    if (!tomorrowOnly && !when.isEmpty() && !when.startsWith(today)) continue;
+                    if (!title.isEmpty()) {
+                        String time = when.length() >= 18 ? when.substring(12).trim() : "";
+                        lines.add(title + (time.isEmpty() ? "" : " الساعة " + time));
+                    }
+                }
+            }
+            if (lines.isEmpty()) return "ما عندكش " + label + (tomorrowOnly ? " مسجلة غدوة." : " مسجلة حالياً.");
+            StringBuilder answer = new StringBuilder("عندك " + (tomorrowOnly ? label + " غدوة: " : label + ": "));
+            for (int i = 0; i < lines.size(); i++) {
+                if (i > 0) answer.append("، ");
+                answer.append(lines.get(i));
+            }
+            return answer.toString();
+        } catch (Exception error) {
+            return "ما قدرتش نقرأ البيانات المحفوظة توا.";
+        }
     }
 
     private void say(String message) {
