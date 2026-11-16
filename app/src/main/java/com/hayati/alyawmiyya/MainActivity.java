@@ -156,6 +156,13 @@ public class MainActivity extends Activity {
         } else if(requestCode==CALL_PERMISSION) {
             if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) performContactAction();
             else toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف.");
+        } else if(requestCode==72) {
+            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                toast("تم تفعيل الميكروفون. استمع الآن إلى أمرك.");
+                startVoiceInput();
+            } else {
+                toast("لم تسمح باستخدام الميكروفون. فعّل الإذن من إعدادات التطبيق.");
+            }
         }
     }
     private void startVoiceInput() {
@@ -169,7 +176,7 @@ public class MainActivity extends Activity {
         try {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-LY");
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar");
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar");
             intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "قولي أمرك...");
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
@@ -179,9 +186,14 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == VOICE_REQUEST && resultCode == RESULT_OK && data != null) {
-            ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            if (results != null && !results.isEmpty()) handleVoiceCommand(results.get(0));
+        if (requestCode == VOICE_REQUEST) {
+            if (resultCode == RESULT_OK && data != null) {
+                ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (results != null && !results.isEmpty()) handleVoiceCommand(results.get(0));
+                else speak("لم ألتقط الكلام بوضوح. حاول مرة أخرى.");
+            } else if (resultCode == RESULT_CANCELED) {
+                toast("لم يتم تسجيل أمر. اضغط الميكروفون وتحدث بعد سماع النغمة.");
+            }
         }
     }
 
@@ -191,12 +203,16 @@ public class MainActivity extends Activity {
     }
 
     private String cleanVoice(String value) {
-        return value == null ? "" : value.trim().replace("،", " ").replace(".", "").replace("؟", "");
+        if (value == null) return "";
+        return value.trim().replace("،", " ").replace(".", "").replace("؟", "")
+            .replace("ـ", "").replaceAll("[\\u064B-\\u065F\\u0670]", "");
     }
 
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
-        String lower = command.toLowerCase(Locale.ROOT);
+        String lower = command.toLowerCase(Locale.ROOT)
+            .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا");
+        command = command.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا");
         if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
             String person=command.replaceFirst("^(اتصل|كلم)\\s*(ب|على|مع)?\\s*","").trim();
@@ -220,7 +236,7 @@ public class MainActivity extends Activity {
             }
             return;
         }
-        if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ")) {
+        if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ") || lower.startsWith("ورّيني ")) {
             if (lower.contains("مهم")) { showTab("tasks"); speak("هذه قائمة المهام"); return; }
             if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذه ملاحظاتك"); return; }
             if (lower.contains("تذكير") || lower.contains("موعد")) { showTab("reminders"); speak("هذه تذكيراتك"); return; }
@@ -240,17 +256,17 @@ public class MainActivity extends Activity {
             else speak("ما عندكش ملاحظات للحذف");
             return;
         }
-        if (lower.startsWith("أضف مهمة") || lower.startsWith("ضيف مهمة") || lower.startsWith("سجل مهمة") || lower.startsWith("مهمة جديدة")) {
-            String title = command.replaceFirst("^(أضف|ضيف|سجل)\\s*مهمة( جديدة)?\\s*", "").replaceFirst("^مهمة جديدة\\s*", "").trim();
+        if (lower.startsWith("اضف مهمة") || lower.startsWith("ضيف مهمة") || lower.startsWith("سجل مهمة") || lower.startsWith("مهمة جديدة")) {
+            String title = command.replaceFirst("^(اضف|ضيف|سجل)\\s*مهمة( جديدة)?\\s*", "").replaceFirst("^مهمة جديدة\\s*", "").trim();
             if (title.isEmpty()) { speak("قولي اسم المهمة بعد كلمة أضف مهمة"); return; }
             JSONObject o = new JSONObject(); put(o,"title",title); put(o,"done",false); tasks.put(o); saveData(); showTab("tasks"); speak("تمت إضافة المهمة: " + title); return;
         }
-        if (lower.startsWith("أضف ملاحظة") || lower.startsWith("ضيف ملاحظة") || lower.startsWith("سجل ملاحظة")) {
-            String body = command.replaceFirst("^(أضف|ضيف|سجل)\\s*ملاحظة\\s*", "").trim();
+        if (lower.startsWith("اضف ملاحظة") || lower.startsWith("ضيف ملاحظة") || lower.startsWith("سجل ملاحظة")) {
+            String body = command.replaceFirst("^(اضف|ضيف|سجل)\\s*ملاحظة\\s*", "").trim();
             if (body.isEmpty()) { speak("قولي نص الملاحظة بعد كلمة أضف ملاحظة"); return; }
             JSONObject o = new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes"); speak("حفظت الملاحظة"); return;
         }
-        if (lower.startsWith("ذكرني") || lower.startsWith("ذكّرني") || lower.startsWith("أضف تذكير") || lower.startsWith("ضيف تذكير")) {
+        if (lower.startsWith("ذكرني") || lower.startsWith("اضف تذكير") || lower.startsWith("ضيف تذكير")) {
             Matcher time = Pattern.compile("(?:الساعة\\s*)?(\\d{1,2})(?::(\\d{1,2}))?").matcher(command);
             if (!time.find()) { speak("قولي وقت التذكير، مثلاً ذكرني غدوة الساعة تسعة بالاتصال"); return; }
             int hour = Integer.parseInt(time.group(1)); int minute = time.group(2)==null?0:Integer.parseInt(time.group(2));
@@ -259,7 +275,7 @@ public class MainActivity extends Activity {
             if (lower.contains("غدوة") || lower.contains("بكرة") || lower.contains("غدا")) when.add(Calendar.DAY_OF_YEAR,1);
             when.set(Calendar.HOUR_OF_DAY,hour); when.set(Calendar.MINUTE,minute); when.set(Calendar.SECOND,0);
             if (when.getTimeInMillis()<=System.currentTimeMillis() && !(lower.contains("غدوة")||lower.contains("بكرة")||lower.contains("غدا"))) when.add(Calendar.DAY_OF_YEAR,1);
-            String title = command.substring(0,time.start()).replaceAll("^(ذكرني|ذكّرني|أضف تذكير|ضيف تذكير)\\s*", "").trim();
+            String title = command.substring(0,time.start()).replaceAll("^(ذكرني|اضف تذكير|ضيف تذكير)\\s*", "").trim();
             title = title.replaceAll("^(غدوة|بكرة|غدا)\\s*", "").trim();
             String tail = command.substring(time.end()).replaceFirst("^\\s*(بال|ب|في)\\s*", "").trim();
             if (!tail.isEmpty()) title = tail;
