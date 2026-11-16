@@ -214,7 +214,7 @@ public class MainActivity extends Activity {
             } else {
                 pendingCallNumber = number;
                 awaitingCallConfirmation = true;
-                speak("هل تريد الاتصال بـ "+pendingContactName+"؟ قل نعم اتصل أو لا ألغي.");
+                speak("هل تريد الاتصال بـ "+pendingContactName+"؟ قل إي اتصل أو لا ألغي.");
                 // Open speech recognition after the spoken confirmation prompt finishes.
                 new Handler(getMainLooper()).postDelayed(() -> {
                     if (awaitingCallConfirmation && !isFinishing()) startVoiceInput();
