@@ -121,9 +121,10 @@ public class MainActivity extends Activity {
             }
         });
         card(pitchGroup);
-        content.addView(button("👨 اختيار الصوت الرجالي",()->chooseArabicVoice()));
+        content.addView(button("👨 اختيار صوت صاحبي الرجالي",()->chooseArabicVoice()));
+        content.addView(button("👩 اختيار صوت نسرين للمكالمات",()->chooseNesreenVoice()));
         content.addView(button("🔊 تجربة الصوت",()->speak("نعم يا صاحبي، هذا اختبار للصوت.")));
-        card(text("اخترنا النبرة المتوسطة افتراضياً. درجة الصوت الفعلية تعتمد أيضاً على الأصوات العربية المثبتة في الهاتف؛ تغيير النبرة لا يضمن تحويل صوت المحرك إلى صوت رجالي إذا لم يتوفر صوت رجالي.",13,Color.GRAY));
+        card(text("صوت صاحبي يُستخدم في الأوامر والمحادثات داخل التطبيق، وصوت نسرين يُستخدم في مكالمات مواعيد العمل فقط. اختر الصوتين من الأصوات العربية المثبتة في هاتفك؛ وصف الصوت أو كونه أنثوياً/رجالياً يعتمد على محرك الهاتف ولا يمكن ضمانه من درجة النبرة وحدها.",13,Color.GRAY));
         Switch assistant=new Switch(this); assistant.setText("تشغيل الأوامر الصوتية بالميكروفون"); assistant.setTextSize(17); assistant.setChecked(p.getBoolean("assistant_enabled",true));
         assistant.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("assistant_enabled",on).apply()); card(assistant);
         Switch wake=new Switch(this);
@@ -453,6 +454,48 @@ public class MainActivity extends Activity {
                 tts.speak("نعم يا صاحبي، هذا صوتي الجديد.",TextToSpeech.QUEUE_FLUSH,null,"voice-choice");
                 dialog.dismiss();
                 toast("تم اختيار الصوت. جرّبه وتأكد أنه رجالي.");
+            }).setNegativeButton("إغلاق",null).show();
+    }
+
+
+    private void chooseNesreenVoice() {
+        if (tts == null || tts.getVoices() == null) {
+            toast("محرك الصوت ما زال يجهز. حاول بعد لحظة.");
+            return;
+        }
+        ArrayList<android.speech.tts.Voice> voices = new ArrayList<>();
+        for (android.speech.tts.Voice voice : tts.getVoices()) {
+            if (voice != null && voice.getLocale() != null
+                && "ar".equalsIgnoreCase(voice.getLocale().getLanguage())
+                && !voice.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)) voices.add(voice);
+        }
+        if (voices.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("لا يوجد صوت عربي متاح")
+                .setMessage("ثبّت صوتاً عربياً أنثوياً من إعدادات تحويل النص إلى كلام في الهاتف، ثم ارجعي واختاريه هنا.")
+                .setPositiveButton("إعدادات الصوت",(d,w)->{
+                    try { startActivity(new Intent("com.android.settings.TTS_SETTINGS")); }
+                    catch(Exception e) { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
+                }).setNegativeButton("إغلاق",null).show();
+            return;
+        }
+        Collections.sort(voices,(a,b)->a.getName().compareToIgnoreCase(b.getName()));
+        String[] names=new String[voices.size()];
+        String selected=getSharedPreferences(PREFS,MODE_PRIVATE).getString("nesreen_voice_name","");
+        int checked=-1;
+        for(int i=0;i<voices.size();i++){
+            names[i]=voices.get(i).getName()+" ("+voices.get(i).getLocale().toLanguageTag()+")";
+            if(voices.get(i).getName().equals(selected))checked=i;
+        }
+        new AlertDialog.Builder(this).setTitle("اختاري صوت نسرين الأنثوي وجربيه")
+            .setSingleChoiceItems(names,checked,(dialog,which)->{
+                android.speech.tts.Voice chosen=voices.get(which);
+                getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("nesreen_voice_name",chosen.getName()).apply();
+                tts.setLanguage(chosen.getLocale());
+                tts.setVoice(chosen);
+                tts.setPitch(1.0f);
+                tts.speak("أهلاً يا صاحبي، معاك نسرين. هذا اختبار صوت المكالمة.",TextToSpeech.QUEUE_FLUSH,null,"nesreen-voice-choice");
+                dialog.dismiss();
+                toast("تم حفظ صوت نسرين للمكالمات. تأكد من الصوت بالسماع.");
             }).setNegativeButton("إغلاق",null).show();
     }
 
