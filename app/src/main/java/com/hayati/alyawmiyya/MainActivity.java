@@ -228,7 +228,7 @@ public class MainActivity extends Activity {
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = normalizeVoiceText(command);
-        if (lower.isEmpty()) { speak("ما وصلنيش كلام واضح. حاول مرة ثانية."); return; }
+        if (lower.isEmpty()) { speak("ما فهمتكش، عاود قولّي."); return; }
 
         if (lower.matches(".*(?:اتصل|كلم|رن على|دق على).*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
@@ -308,7 +308,7 @@ public class MainActivity extends Activity {
             scheduleReminder(title,when); speak("تمام، ضبطت التذكير: " + title); return;
         }
 
-        speak("سمعتك تقول: " + command + ". لكن ما عرفتش نوع الأمر. تقدر تقول: نبي نضيف مهمة، ديرلي ملاحظة، وريني المهام، أو ذكرني الساعة تسعة.");
+        speak("ما فهمتكش، عاود قولّي.");
     }
 
     private void showTab(String tab) {
