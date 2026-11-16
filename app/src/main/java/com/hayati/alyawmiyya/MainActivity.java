@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
         requestNotificationPermission();
         buildShell();
         showTab("today");
+        checkForUpdates();
     }
 
     private void put(JSONObject object, String key, Object value) { try { object.put(key, value); } catch (Exception ignored) {} }
@@ -734,6 +735,48 @@ public class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},41);
     }
+
+    // Check the latest main-branch commit in the background and notify if this APK is outdated.
+    private void checkForUpdates() {
+        new Thread(() -> {
+            java.net.HttpURLConnection connection = null;
+            try {
+                java.net.URL url = new java.net.URL("https://api.github.com/repos/alb567z/hayati-alyawmiyya/commits/main");
+                connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(7000);
+                connection.setReadTimeout(7000);
+                connection.setRequestProperty("Accept", "application/vnd.github+json");
+                connection.setRequestProperty("User-Agent", "Sahbi-Android-App");
+                if (connection.getResponseCode() != 200) return;
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(), "UTF-8"));
+                StringBuilder body = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) body.append(line);
+                reader.close();
+                String latestSha = new JSONObject(body.toString()).optString("sha", "");
+                String installedSha = BuildConfig.SOURCE_COMMIT;
+                if (!latestSha.isEmpty() && !"local".equals(installedSha) && !latestSha.startsWith(installedSha) && !installedSha.startsWith(latestSha)) {
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        new AlertDialog.Builder(MainActivity.this)
+                            .setTitle("تحديث جديد لصاحبي")
+                            .setMessage("فيه إصدار أحدث من صاحبي. تبي تفتح صفحة تنزيل آخر نسخة؟")
+                            .setNegativeButton("لاحقاً", null)
+                            .setPositiveButton("تنزيل التحديث", (dialog, which) -> {
+                                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/alb567z/hayati-alyawmiyya/actions/workflows/android.yml"))); }
+                                catch (Exception e) { toast("تعذر فتح صفحة التحديث."); }
+                            }).show();
+                    });
+                }
+            } catch (Exception ignored) {
+                // No internet or GitHub temporarily unavailable: keep the app usable.
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
+    }
+
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     @Override protected void onDestroy() { if (tts != null) { tts.stop(); tts.shutdown(); } super.onDestroy(); }
 }
