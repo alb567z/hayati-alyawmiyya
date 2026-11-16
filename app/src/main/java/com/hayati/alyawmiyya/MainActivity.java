@@ -582,6 +582,27 @@ public class MainActivity extends Activity {
         String lower = normalized.replaceFirst("^(?:يا\\s+)?صاحبي\\s*", "").trim();
         if (lower.isEmpty()) { speak("ما فهمتكش، عاود قولّي."); return; }
 
+        String mediaAction = null;
+        if (lower.matches(".*(?:ارفع|علي|زيد).*صوت.*")) mediaAction = "volume_up";
+        else if (lower.matches(".*(?:وطي|نقص|خفض).*صوت.*")) mediaAction = "volume_down";
+        else if (lower.matches(".*(?:التالي|الاغنيه الجايه|الفيديو الجاي|المقطع التالي).*")) mediaAction = "next";
+        else if (lower.matches(".*(?:السابق|اللي قبل|الاغنيه السابقه|الفيديو السابق).*")) mediaAction = "previous";
+        else if (lower.matches(".*(?:وقف|اوقف|ايقاف|حبس|توقف).*")) mediaAction = "play_pause";
+        else if (lower.matches(".*(?:كمل|استمر|شغل الموسيقى|شغل الفيديو|شغل الفيلم|واصل).*")) mediaAction = "play_pause";
+        if (mediaAction != null) {
+            if (!NotificationReaderService.hasAccess(this)) {
+                speak("باش نتحكم في الفيديو والموسيقى، فعّل إذن الإشعارات لصاحبي من الإعدادات.");
+                try { startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)); } catch(Exception ignored) {}
+            } else if (NotificationReaderService.controlMedia(this, mediaAction)) {
+                if ("volume_up".equals(mediaAction)) speak("عليت الصوت.");
+                else if ("volume_down".equals(mediaAction)) speak("وطيّت الصوت.");
+                else if ("next".equals(mediaAction)) speak("التالي.");
+                else if ("previous".equals(mediaAction)) speak("السابق.");
+                else speak("حاضر.");
+            } else speak("ما لقيتش مشغل وسائط نشط أو التطبيق ما يدعمش الأمر.");
+            return;
+        }
+
         if (lower.contains("كم الساعه") || lower.equals("الساعه") || lower.contains("الوقت توا") || lower.contains("الوقت الان")) {
             String currentTime = new SimpleDateFormat("HH:mm", new Locale("ar", "LY")).format(new Date());
             speak("الساعة الآن " + currentTime);
