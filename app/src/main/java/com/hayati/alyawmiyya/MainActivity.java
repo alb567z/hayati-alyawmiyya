@@ -32,6 +32,8 @@ public class MainActivity extends Activity {
         showTab("today");
     }
 
+    private void put(JSONObject object, String key, Object value) { try { object.put(key, value); } catch (Exception ignored) {} }
+
     private void loadData() {
         android.content.SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         tasks = readArray(p.getString(TASKS, "[]"));
@@ -105,14 +107,14 @@ public class MainActivity extends Activity {
             final int index=i; JSONObject o=tasks.optJSONObject(i); if(o==null) continue;
             LinearLayout line=new LinearLayout(this); line.setGravity(Gravity.CENTER_VERTICAL);
             CheckBox cb=new CheckBox(this); cb.setText(o.optString("title")); cb.setTextSize(16); cb.setTextColor(ink); cb.setChecked(o.optBoolean("done"));
-            cb.setOnCheckedChangeListener((v,checked)->{o.put("done",checked);saveData();});
+            cb.setOnCheckedChangeListener((v,checked)->{put(o,"done",checked);saveData();});
             line.addView(cb,new LinearLayout.LayoutParams(0,-2,1));
             Button del=new Button(this); del.setText("حذف"); del.setTextSize(11); del.setOnClickListener(v->{tasks.remove(index);saveData();showTab("tasks");});
             line.addView(del); card(line);
         }
         if(tasks.length()==0) card(text("قائمة المهام فارغة حالياً.",15,Color.GRAY));
     }
-    private void addTask() { inputDialog("مهمة جديدة","اكتب المهمة",value->{JSONObject o=new JSONObject();o.put("title",value);o.put("done",false);tasks.put(o);saveData();showTab(currentTab);}); }
+    private void addTask() { inputDialog("مهمة جديدة","اكتب المهمة",value->{JSONObject o=new JSONObject();put(o,"title",value);put(o,"done",false);tasks.put(o);saveData();showTab(currentTab);}); }
     private void showNotes() {
         heading("ملاحظاتي", "أفكارك ومعلوماتك في مكان واحد");
         content.addView(button("＋ ملاحظة جديدة",()->addNote()));
@@ -133,7 +135,7 @@ public class MainActivity extends Activity {
         EditText body=new EditText(this);body.setHint("اكتب ملاحظتك هنا");body.setMinLines(3);body.setGravity(Gravity.TOP);fields.addView(body);
         new AlertDialog.Builder(this).setTitle("ملاحظة جديدة").setView(fields).setNegativeButton("إلغاء",null).setPositiveButton("حفظ",(d,w)->{
             String t=title.getText().toString().trim(), b=body.getText().toString().trim(); if(t.isEmpty()&&b.isEmpty())return;
-            JSONObject o=new JSONObject();o.put("title",t.isEmpty()?"ملاحظة":t);o.put("body",b);notes.put(o);saveData();showTab("notes");
+            JSONObject o=new JSONObject();put(o,"title",t.isEmpty()?"ملاحظة":t);put(o,"body",b);notes.put(o);saveData();showTab("notes");
         }).show();
     }
     private void editNote(int index) {
@@ -142,7 +144,7 @@ public class MainActivity extends Activity {
         EditText title=new EditText(this);title.setText(old.optString("title"));fields.addView(title);
         EditText body=new EditText(this);body.setText(old.optString("body"));body.setMinLines(3);body.setGravity(Gravity.TOP);fields.addView(body);
         new AlertDialog.Builder(this).setTitle("تعديل الملاحظة").setView(fields).setNegativeButton("إلغاء",null).setPositiveButton("حفظ",(d,w)->{
-            old.put("title",title.getText().toString());old.put("body",body.getText().toString());saveData();showTab("notes");
+            put(old,"title",title.getText().toString());put(old,"body",body.getText().toString());saveData();showTab("notes");
         }).show();
     }
     private void inputDialog(String title,String hint, java.util.function.Consumer<String> done) {
@@ -182,7 +184,7 @@ public class MainActivity extends Activity {
         AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
         if(am!=null){if(Build.VERSION.SDK_INT>=23)am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);else am.set(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);}
         String label=new SimpleDateFormat("yyyy/MM/dd  HH:mm",Locale.getDefault()).format(when.getTime());
-        JSONObject o=new JSONObject();o.put("id",id);o.put("title",title);o.put("when",label);reminders.put(o);saveData();showTab("reminders");toast("تم حفظ التذكير");
+        JSONObject o=new JSONObject();put(o,"id",id);put(o,"title",title);put(o,"when",label);reminders.put(o);saveData();showTab("reminders");toast("تم حفظ التذكير");
     }
     private void cancelReminder(int id) {
         Intent intent=new Intent(this,ReminderReceiver.class);
