@@ -13,7 +13,7 @@ android {
         targetSdk 28
         versionCode 3
         versionName '1.2'
-        buildConfigField 'String', 'SOURCE_COMMIT', '\"' + (System.getenv('GITHUB_SHA') ?: 'local') + '\"'
+        buildConfigField 'String', 'SOURCE_COMMIT', '"' + (System.getenv('GITHUB_SHA') ?: 'local') + '"'
     }
 
     buildFeatures { buildConfig true }
