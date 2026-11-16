@@ -225,6 +225,52 @@ public class MainActivity extends Activity {
         return s.replaceAll("\\s+", " ").trim();
     }
 
+    private int findVoiceItem(JSONArray array, String query, String... fields) {
+        String wanted = normalizeVoiceText(query);
+        if (wanted.isEmpty() || wanted.equals("اخر") || wanted.equals("الاخير") || wanted.equals("الاخيره")) return array.length() - 1;
+        for (int i = array.length() - 1; i >= 0; i--) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) continue;
+            for (String field : fields) {
+                String value = normalizeVoiceText(item.optString(field, ""));
+                if (!value.isEmpty() && (value.contains(wanted) || wanted.contains(value))) return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean handleVoiceDelete(String lower) {
+        if (!lower.matches(".*(?:احذف|امسح|الغ|الغي|الغاء|كنسل|بطل).*")) return false;
+        boolean task = lower.contains("مهمه") || lower.contains("مهام");
+        boolean note = lower.contains("ملاحظه") || lower.contains("ملاحظات");
+        boolean reminder = lower.contains("تذكير") || lower.contains("موعد");
+        if (!task && !note && !reminder) return false;
+
+        String kind = task ? "مهمه" : note ? "ملاحظه" : "تذكير";
+        String query = lower.replaceAll(".*?(?:احذف|امسح|الغ|الغي|الغاء|كنسل|بطل)\\s*", "");
+        query = query.replaceFirst("^(?:لي\\s*)?(?:اخر|الاخير|الاخيره|كل|هذا|هذي)?\\s*", "");
+        query = query.replaceFirst("^" + kind + "(?:\\s*رقم\\s*\\d+)?\\s*", "").trim();
+        query = query.replaceFirst("^(?:اللي\\s*)", "").trim();
+
+        if (task) {
+            int index = findVoiceItem(tasks, query, "title");
+            if (index >= 0) { tasks.remove(index); saveData(); showTab("tasks"); speak("تمام، حذفت المهمة."); }
+            else speak("ما لقيتش المهمة المطلوبة.");
+        } else if (note) {
+            int index = findVoiceItem(notes, query, "title", "body");
+            if (index >= 0) { notes.remove(index); saveData(); showTab("notes"); speak("تمام، حذفت الملاحظة."); }
+            else speak("ما لقيتش الملاحظة المطلوبة.");
+        } else {
+            int index = findVoiceItem(reminders, query, "title");
+            if (index >= 0) {
+                JSONObject item = reminders.optJSONObject(index);
+                if (item != null) cancelReminder(item.optInt("id"));
+                reminders.remove(index); saveData(); showTab("reminders"); speak("تمام، ألغيت التذكير.");
+            } else speak("ما لقيتش التذكير المطلوب.");
+        }
+        return true;
+    }
+
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = normalizeVoiceText(command);
@@ -235,6 +281,9 @@ public class MainActivity extends Activity {
             speak("وعليكم السلام ورحمة الله، أهلاً بيك! كيف نقدر نساعدك؟");
             return;
         }
+
+        // أوامر حذف المهام والملاحظات وإلغاء التذكيرات بالاسم أو بآخر عنصر
+        if (handleVoiceDelete(lower)) return;
 
         if (lower.matches(".*(?:اتصل|كلم|رن على|دق على).*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("الاتصال مقفول من الإعدادات."); return; }
