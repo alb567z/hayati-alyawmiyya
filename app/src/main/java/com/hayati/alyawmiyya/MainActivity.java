@@ -267,6 +267,7 @@ public class MainActivity extends Activity {
         if ("today".equals(tab)) showToday();
         else if ("tasks".equals(tab)) showTasks();
         else if ("reminders".equals(tab)) showReminders();
+        else if ("settings".equals(tab)) showSettings();
         else showNotes();
     }
     private TextView text(String value, int size, int color) {
