@@ -8,6 +8,10 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.*;
 import android.widget.*;
+import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.text.SimpleDateFormat;
@@ -20,12 +24,15 @@ public class MainActivity extends Activity {
     private String currentTab = "today";
     private final int ink = Color.rgb(35, 48, 65), teal = Color.rgb(0, 137, 123);
     private JSONArray tasks, notes, reminders;
+    private TextToSpeech tts;
+    private static final int VOICE_REQUEST = 702;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.rgb(0, 105, 92));
         getWindow().setNavigationBarColor(Color.rgb(250, 250, 250));
         loadData();
+        tts = new TextToSpeech(this, status -> { if (status == TextToSpeech.SUCCESS) tts.setLanguage(new Locale("ar")); });
         createNotificationChannel();
         requestNotificationPermission();
         buildShell();
@@ -63,6 +70,93 @@ public class MainActivity extends Activity {
         Button b = new Button(this); b.setText(label); b.setTextSize(12); b.setAllCaps(false);
         b.setOnClickListener(v -> showTab(id)); nav.addView(b,new LinearLayout.LayoutParams(0,54,1));
     }
+    private void startVoiceInput() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, 72);
+            toast("اسمح باستخدام الميكروفون، ثم اضغط زر التحدث مرة أخرى");
+            return;
+        }
+        if (!getPackageManager().hasSystemFeature("android.hardware.microphone")) { toast("الميكروفون غير متاح على هذا الهاتف"); return; }
+        try {
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-LY");
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar");
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "قولي أمرك...");
+            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+            startActivityForResult(intent, VOICE_REQUEST);
+        } catch (Exception e) { speak("خدمة التعرف على الصوت غير متوفرة. تأكد من وجود تطبيق مساعد صوتي."); }
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VOICE_REQUEST && resultCode == RESULT_OK && data != null) {
+            ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (results != null && !results.isEmpty()) handleVoiceCommand(results.get(0));
+        }
+    }
+
+    private void speak(String message) {
+        toast(message);
+        if (tts != null) tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "hayati_voice");
+    }
+
+    private String cleanVoice(String value) {
+        return value == null ? "" : value.trim().replace("،", " ").replace(".", "").replace("؟", "");
+    }
+
+    private void handleVoiceCommand(String raw) {
+        String command = cleanVoice(raw);
+        String lower = command.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ")) {
+            if (lower.contains("مهم")) { showTab("tasks"); speak("هذه قائمة المهام"); return; }
+            if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذه ملاحظاتك"); return; }
+            if (lower.contains("تذكير") || lower.contains("موعد")) { showTab("reminders"); speak("هذه تذكيراتك"); return; }
+            if (lower.contains("اليوم")) { showTab("today"); speak("هذا ملخص يومك"); return; }
+        }
+        if (lower.contains("كم") && (lower.contains("مهمة") || lower.contains("مهام"))) {
+            int done = 0; for (int i=0;i<tasks.length();i++) if (tasks.optJSONObject(i)!=null && tasks.optJSONObject(i).optBoolean("done")) done++;
+            speak("عندك " + tasks.length() + " مهام، أنجزت منها " + done); return;
+        }
+        if (lower.startsWith("احذف") && lower.contains("آخر") && lower.contains("مهم")) {
+            if (tasks.length()>0) { tasks.remove(tasks.length()-1); saveData(); showTab("tasks"); speak("حذفت آخر مهمة"); }
+            else speak("ما عندكش مهام للحذف");
+            return;
+        }
+        if (lower.startsWith("احذف") && lower.contains("آخر") && lower.contains("ملاحظ")) {
+            if (notes.length()>0) { notes.remove(notes.length()-1); saveData(); showTab("notes"); speak("حذفت آخر ملاحظة"); }
+            else speak("ما عندكش ملاحظات للحذف");
+            return;
+        }
+        if (lower.startsWith("أضف مهمة") || lower.startsWith("ضيف مهمة") || lower.startsWith("سجل مهمة") || lower.startsWith("مهمة جديدة")) {
+            String title = command.replaceFirst("^(أضف|ضيف|سجل)\\s*مهمة( جديدة)?\\s*", "").replaceFirst("^مهمة جديدة\\s*", "").trim();
+            if (title.isEmpty()) { speak("قولي اسم المهمة بعد كلمة أضف مهمة"); return; }
+            JSONObject o = new JSONObject(); put(o,"title",title); put(o,"done",false); tasks.put(o); saveData(); showTab("tasks"); speak("تمت إضافة المهمة: " + title); return;
+        }
+        if (lower.startsWith("أضف ملاحظة") || lower.startsWith("ضيف ملاحظة") || lower.startsWith("سجل ملاحظة")) {
+            String body = command.replaceFirst("^(أضف|ضيف|سجل)\\s*ملاحظة\\s*", "").trim();
+            if (body.isEmpty()) { speak("قولي نص الملاحظة بعد كلمة أضف ملاحظة"); return; }
+            JSONObject o = new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes"); speak("حفظت الملاحظة"); return;
+        }
+        if (lower.startsWith("ذكرني") || lower.startsWith("ذكّرني") || lower.startsWith("أضف تذكير") || lower.startsWith("ضيف تذكير")) {
+            Matcher time = Pattern.compile("(?:الساعة\\s*)?(\\d{1,2})(?::(\\d{1,2}))?").matcher(command);
+            if (!time.find()) { speak("قولي وقت التذكير، مثلاً ذكرني غدوة الساعة تسعة بالاتصال"); return; }
+            int hour = Integer.parseInt(time.group(1)); int minute = time.group(2)==null?0:Integer.parseInt(time.group(2));
+            if (hour>23 || minute>59) { speak("الوقت غير صحيح"); return; }
+            Calendar when = Calendar.getInstance();
+            if (lower.contains("غدوة") || lower.contains("بكرة") || lower.contains("غدا")) when.add(Calendar.DAY_OF_YEAR,1);
+            when.set(Calendar.HOUR_OF_DAY,hour); when.set(Calendar.MINUTE,minute); when.set(Calendar.SECOND,0);
+            if (when.getTimeInMillis()<=System.currentTimeMillis() && !(lower.contains("غدوة")||lower.contains("بكرة")||lower.contains("غدا"))) when.add(Calendar.DAY_OF_YEAR,1);
+            String title = command.substring(0,time.start()).replaceAll("^(ذكرني|ذكّرني|أضف تذكير|ضيف تذكير)\\s*", "").trim();
+            title = title.replaceAll("^(غدوة|بكرة|غدا)\\s*", "").trim();
+            String tail = command.substring(time.end()).replaceFirst("^\\s*(بال|ب|في)\\s*", "").trim();
+            if (!tail.isEmpty()) title = tail;
+            if (title.isEmpty()) title = "تذكير";
+            scheduleReminder(title,when); speak("تم ضبط التذكير " + title); return;
+        }
+        speak("ما فهمتش الأمر. جرب: أضف مهمة، أضف ملاحظة، اعرض المهام، أو ذكرني غدوة الساعة تسعة");
+    }
+
     private void showTab(String tab) {
         currentTab=tab; content.removeAllViews();
         if ("today".equals(tab)) showToday();
@@ -200,4 +294,5 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},41);
     }
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
+    @Override protected void onDestroy() { if (tts != null) { tts.stop(); tts.shutdown(); } super.onDestroy(); }
 }
