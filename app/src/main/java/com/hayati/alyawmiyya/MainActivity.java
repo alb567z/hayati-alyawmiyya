@@ -82,14 +82,24 @@ public class MainActivity extends Activity {
         TextView brand = new TextView(this); brand.setText("صاحبي  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(26); brand.setTypeface(null, android.graphics.Typeface.BOLD); brand.setGravity(Gravity.RIGHT);
         TextView sub = new TextView(this); sub.setText("مساحتك لتنظيم يومك بكل سهولة"); sub.setTextColor(Color.rgb(220,245,240)); sub.setTextSize(14); sub.setGravity(Gravity.RIGHT);
         header.addView(brand); header.addView(sub); Button voice = new Button(this); voice.setText("🎤 تحدث إلى صاحبي"); voice.setAllCaps(false); voice.setTextSize(15); voice.setTextColor(Color.rgb(0,105,92)); voice.setBackground(roundDrawable(Color.WHITE,18)); voice.setOnClickListener(v -> startVoiceInput()); LinearLayout.LayoutParams voiceLp = new LinearLayout.LayoutParams(-1, -2); voiceLp.topMargin = 12; header.addView(voice, voiceLp); root.addView(header);
+        // Navigation is placed directly below the header, above the page content.
+        HorizontalScrollView navScroll = new HorizontalScrollView(this);
+        navScroll.setHorizontalScrollBarEnabled(false);
+        navScroll.setFillViewport(false);
+        nav = new LinearLayout(this); nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setPadding(6,8,6,8); nav.setBackgroundColor(Color.WHITE);
+        navScroll.addView(nav, new HorizontalScrollView.LayoutParams(-2,-2));
+        root.addView(navScroll, new LinearLayout.LayoutParams(-1,-2));
+        addNav("today","اليوم"); addNav("tasks","المهام"); addNav("reminders","التذكيرات"); addNav("notes","الملاحظات"); addNav("settings","الإعدادات");
+
         ScrollView scroll = new ScrollView(this); content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(16,16,16,22);
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
-        nav = new LinearLayout(this); nav.setPadding(4,8,4,8); nav.setBackgroundColor(Color.WHITE); root.addView(nav);
-        addNav("today","اليوم"); addNav("tasks","المهام"); addNav("reminders","التذكيرات"); addNav("notes","الملاحظات"); addNav("settings","الإعدادات");
     }
     private void addNav(String id, String label) {
-        Button b = new Button(this); b.setText(label); b.setTextSize(12); b.setAllCaps(false);
-        b.setOnClickListener(v -> showTab(id)); nav.addView(b,new LinearLayout.LayoutParams(0,54,1));
+        Button b = new Button(this); b.setText(label); b.setTextSize(13); b.setAllCaps(false);
+        b.setMinWidth((int)(84 * getResources().getDisplayMetrics().density));
+        b.setOnClickListener(v -> showTab(id));
+        nav.addView(b,new LinearLayout.LayoutParams((int)(92 * getResources().getDisplayMetrics().density),54));
     }
     private void showSettings() {
         heading("الإعدادات", "تحكم في صلاحيات وميزات صاحبي");
