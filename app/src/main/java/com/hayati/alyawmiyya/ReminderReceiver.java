@@ -12,15 +12,30 @@ public class ReminderReceiver extends BroadcastReceiver {
   open.putExtra("title",title);open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
   PendingIntent content=PendingIntent.getActivity(context,id,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   NotificationManager nm=(NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);if(nm==null)return;
-  String channel=work?"sahbi_work_calls":"hayati_reminders";
-  if(Build.VERSION.SDK_INT>=26){NotificationChannel ch=new NotificationChannel(channel,work?"اتصالات مواعيد العمل":"تذكيرات صاحبي",NotificationManager.IMPORTANCE_HIGH);ch.setDescription(work?"اتصال افتراضي لموعد العمل":"تنبيهات المواعيد");nm.createNotificationChannel(ch);}
+  String channel=work?"sahbi_work_calls_v2":"hayati_reminders_v2";
+  if(Build.VERSION.SDK_INT>=26){
+   NotificationChannel ch=new NotificationChannel(channel,work?"اتصالات مواعيد العمل — نسرين":"تذكيرات صاحبي",NotificationManager.IMPORTANCE_HIGH);
+   ch.setDescription(work?"اتصال افتراضي لموعد العمل":"تنبيهات المواعيد");
+   ch.enableVibration(true);
+   if(work){
+    ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+    android.net.Uri sound=android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+    android.media.AudioAttributes audio=new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+    if(sound!=null)ch.setSound(sound,audio);
+   }
+   nm.createNotificationChannel(ch);
+  }
   Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(context,channel):new Notification.Builder(context);
   b.setSmallIcon(work?android.R.drawable.sym_call_incoming:android.R.drawable.ic_dialog_info)
    .setContentTitle(work?"مكالمة واردة — نسرين":"صاحبي").setContentText(work?"موعد عملك: "+title:title)
    .setStyle(new Notification.BigTextStyle().bigText(work?"نسرين تتصل بك للتذكير بموعد العمل: "+title:title))
    .setCategory(work?Notification.CATEGORY_CALL:Notification.CATEGORY_REMINDER)
    .setPriority(work?Notification.PRIORITY_MAX:Notification.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(content);
-  if(work)b.setFullScreenIntent(content,true);
+  if(Build.VERSION.SDK_INT<26){
+   b.setDefaults(Notification.DEFAULT_ALL);
+   if(work)b.setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE));
+  }
+  if(work && (Build.VERSION.SDK_INT<34 || nm.canUseFullScreenIntent()))b.setFullScreenIntent(content,true);
   nm.notify(id,b.build());
  }
 }
