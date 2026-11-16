@@ -247,8 +247,7 @@ public class MainActivity extends Activity {
         enrollmentButton.setAllCaps(false);
         enrollmentButton.setText("ابدأ التسجيل 1/3");
         panel.addView(enrollmentButton);
-        enrollmentDialog = new AlertDialog.Builder(this)
-            .setTitle("التعرّف الأولي على صوتك")
+        enrollmentDialog = new AlertDialog.Builder(this)            .setTitle("التعرّف الأولي على صوتك")
             .setView(panel)
             .setNegativeButton("لاحقاً", (d, w) -> cancelEnrollment())
             .setOnCancelListener(d -> cancelEnrollment())
@@ -455,8 +454,13 @@ public class MainActivity extends Activity {
 
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
-        String lower = normalizeVoiceText(command);
-        lower = lower.replaceFirst("^(?:يا\\s+)?صاحبي\\s*", "").trim();
+        String normalized = normalizeVoiceText(command);
+        // A wake phrase on its own is a greeting, not an unknown command.
+        if (normalized.matches("^(?:يا\\s+)?صاحبي$") || normalized.equals("يا صاح")) {
+            speak("نعم يا صاحبي");
+            return;
+        }
+        String lower = normalized.replaceFirst("^(?:يا\\s+)?صاحبي\\s*", "").trim();
         if (lower.isEmpty()) { speak("ما فهمتكش، عاود قولّي."); return; }
 
         if (lower.contains("كم الساعه") || lower.equals("الساعه") || lower.contains("الوقت توا") || lower.contains("الوقت الان")) {
@@ -497,8 +501,7 @@ public class MainActivity extends Activity {
 
         if (lower.matches(".*(?:ابعث|ارسل|أرسل|دز).*رساله.*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("sms_enabled",true)) { speak("الرسائل مقفولة من الإعدادات."); return; }
-            String rest = lower.replaceFirst(".*?(?:ابعث|ارسل|أرسل|دز)\\s*رساله\\s*(?:الى|ل)?\\s*", "");
-            int split = rest.indexOf(" نصها ");
+            String rest = lower.replaceFirst(".*?(?:ابعث|ارسل|أرسل|دز)\\s*رساله\\s*(?:الى|ل)?\\s*", "");            int split = rest.indexOf(" نصها ");
             if (split < 1) split = rest.indexOf(" نص ");
             if (split < 1) speak("قولي مثلاً: ابعث رسالة لعبد الباري، واكتب فيها السلام عليكم.");
             else {
@@ -747,8 +750,7 @@ public class MainActivity extends Activity {
                 chosen.set(Calendar.HOUR_OF_DAY,hour);chosen.set(Calendar.MINUTE,minute);chosen.set(Calendar.SECOND,0);
                 if(chosen.getTimeInMillis()<=System.currentTimeMillis()){toast("اختَر وقتاً في المستقبل");return;}
                 inputDialog("عنوان التذكير","مثلاً: الاتصال بعبدالباري",title->scheduleReminder(title,chosen));
-            },c.get(Calendar.HOUR_OF_DAY),c.get(Calendar.MINUTE),true).show();
-        },c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();
+            },c.get(Calendar.HOUR_OF_DAY),c.get(Calendar.MINUTE),true).show();        },c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();
     }
     private void scheduleReminder(String title,Calendar when) {
         int id=(int)(System.currentTimeMillis() & 0x7fffffff);
