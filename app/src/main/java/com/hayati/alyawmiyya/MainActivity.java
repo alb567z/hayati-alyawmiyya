@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
         tts = new TextToSpeech(this, status -> { if (status == TextToSpeech.SUCCESS) { tts.setLanguage(new Locale("ar", "LY")); applyVoiceSettings(tts); } });
         createNotificationChannel();
         requestNotificationPermission();
+        rescheduleSavedReminders();
         buildShell();
         showTab("today");
         checkForUpdates();
@@ -1040,13 +1041,70 @@ public class MainActivity extends Activity {
     private void scheduleReminder(String title,Calendar when) { scheduleReminder(title,when,"reminder"); }
     private void scheduleReminder(String title,Calendar when,String type) {
         int id=(int)(System.currentTimeMillis() & 0x7fffffff);
-        Intent intent=new Intent(this,ReminderReceiver.class);intent.putExtra("title",title);intent.putExtra("id",id);intent.putExtra("type",type);
-        PendingIntent pi=PendingIntent.getBroadcast(this,id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
-        if(am!=null){if(Build.VERSION.SDK_INT>=23)am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);else am.set(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);}
+        boolean exact=setReminderAlarm(id,title,type,when.getTimeInMillis());
         String label=new SimpleDateFormat("yyyy/MM/dd  HH:mm",Locale.getDefault()).format(when.getTime());
         JSONObject o=new JSONObject();put(o,"id",id);put(o,"title",title);put(o,"when",label);put(o,"type",type);reminders.put(o);saveData();showTab("reminders");
-        toast("work".equals(type)?"تم حفظ موعد العمل؛ سيصلك اتصال من نسرين":"تم حفظ التذكير");
+        if(!notificationsAllowed()) {
+            new AlertDialog.Builder(this).setTitle("التنبيهات مقفولة")
+                .setMessage("تم حفظ الموعد، لكن إشعارات صاحبي ممنوعة من إعدادات الهاتف. فعّل الإشعارات حتى يصلك التنبيه.")
+                .setPositiveButton("فتح إعدادات الإشعارات",(d,w)->openAppNotificationSettings())
+                .setNegativeButton("لاحقاً",null).show();
+        } else if(!exact) {
+            new AlertDialog.Builder(this).setTitle("السماح بالمنبّهات الدقيقة")
+                .setMessage("تم حفظ الموعد، لكن الهاتف لا يسمح حالياً بالمنبّهات الدقيقة؛ قد يتأخر التنبيه. فعّل «المنبّهات والتذكيرات» لصاحبي.")
+                .setPositiveButton("فتح الإعدادات",(d,w)->openExactAlarmSettings())
+                .setNegativeButton("لاحقاً",null).show();
+        } else toast("work".equals(type)?"تم حفظ موعد العمل وضبط تنبيه نسرين":"تم حفظ التذكير");
+    }
+    private PendingIntent reminderPendingIntent(int id,String title,String type) {
+        Intent intent=new Intent(this,ReminderReceiver.class);
+        intent.putExtra("title",title);intent.putExtra("id",id);intent.putExtra("type",type);
+        return PendingIntent.getBroadcast(this,id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+    }
+    private boolean setReminderAlarm(int id,String title,String type,long triggerAt) {
+        AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
+        if(am==null)return false;
+        PendingIntent pi=reminderPendingIntent(id,title,type);
+        try {
+            if(Build.VERSION.SDK_INT>=31 && !am.canScheduleExactAlarms()) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,triggerAt,pi);
+                return false;
+            }
+            if(Build.VERSION.SDK_INT>=23)am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,triggerAt,pi);
+            else am.setExact(AlarmManager.RTC_WAKEUP,triggerAt,pi);
+            return true;
+        } catch(SecurityException e) {
+            try { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,triggerAt,pi); } catch(Exception ignored) {}
+            return false;
+        }
+    }
+    private void rescheduleSavedReminders() {
+        SimpleDateFormat format=new SimpleDateFormat("yyyy/MM/dd  HH:mm",Locale.getDefault());
+        for(int i=0;i<reminders.length();i++) {
+            JSONObject item=reminders.optJSONObject(i); if(item==null)continue;
+            try {
+                long at=format.parse(item.optString("when","")).getTime();
+                if(at>System.currentTimeMillis())setReminderAlarm(item.optInt("id"),item.optString("title","تذكير"),item.optString("type","reminder"),at);
+            } catch(Exception ignored) {}
+        }
+    }
+    private boolean notificationsAllowed() {
+        NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+        return nm==null || Build.VERSION.SDK_INT<24 || nm.areNotificationsEnabled();
+    }
+    private void openAppNotificationSettings() {
+        try {
+            Intent i=new Intent();
+            if(Build.VERSION.SDK_INT>=26){i.setAction("android.settings.APP_NOTIFICATION_SETTINGS");i.putExtra("android.provider.extra.APP_PACKAGE",getPackageName());}
+            else {i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);i.setData(Uri.parse("package:"+getPackageName()));}
+            startActivity(i);
+        } catch(Exception e){openAppSettings();}
+    }
+    private void openExactAlarmSettings() {
+        try {
+            if(Build.VERSION.SDK_INT>=31)startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+getPackageName())));
+            else openAppSettings();
+        } catch(Exception e){openAppSettings();}
     }
     private void cancelReminder(int id) {
         Intent intent=new Intent(this,ReminderReceiver.class);
@@ -1054,7 +1112,22 @@ public class MainActivity extends Activity {
         AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);if(am!=null)am.cancel(pi);pi.cancel();
     }
     private void createNotificationChannel() {
-        if(Build.VERSION.SDK_INT>=26){NotificationChannel ch=new NotificationChannel("hayati_reminders","تذكيرات حياتي اليومية",NotificationManager.IMPORTANCE_HIGH);ch.setDescription("تنبيهات المواعيد والمهام");((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(ch);}
+        if(Build.VERSION.SDK_INT>=26){
+            NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+            if(nm==null)return;
+            NotificationChannel remindersChannel=new NotificationChannel("hayati_reminders_v2","تذكيرات صاحبي",NotificationManager.IMPORTANCE_HIGH);
+            remindersChannel.setDescription("تنبيهات المواعيد والمهام");
+            remindersChannel.enableVibration(true);
+            NotificationChannel workChannel=new NotificationChannel("sahbi_work_calls_v2","اتصالات مواعيد العمل — نسرين",NotificationManager.IMPORTANCE_HIGH);
+            workChannel.setDescription("تنبيه صوتي ومرئي عند حلول موعد العمل");
+            workChannel.enableVibration(true);
+            workChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            android.net.Uri sound=android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+            android.media.AudioAttributes audio=new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+            if(sound!=null)workChannel.setSound(sound,audio);
+            nm.createNotificationChannel(remindersChannel);
+            nm.createNotificationChannel(workChannel);
+        }
     }
     private void requestNotificationPermission() {
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)
