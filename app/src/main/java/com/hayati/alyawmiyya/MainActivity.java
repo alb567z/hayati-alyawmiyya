@@ -738,7 +738,7 @@ public class MainActivity extends Activity {
             showTab("notes");
             return;
         }
-        if ((lower.contains("مهم") || lower.contains("حاجات بندير")) && (lower.contains("شن") || lower.contains("عندي") || lower.contains("اقرا") || lower.contains("اقرأ"))) {
+        if ((lower.contains("مهم") || lower.contains("مهام") || lower.contains("حاجات بندير")) && (lower.contains("شن") || lower.contains("عندي") || lower.contains("اقرا") || lower.contains("اقرأ"))) {
             speakSavedItems("tasks", false);
             showTab("tasks");
             return;
