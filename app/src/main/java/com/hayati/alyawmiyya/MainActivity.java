@@ -104,7 +104,11 @@ public class MainActivity extends Activity {
         card(text("الاتصال: عند قول «اتصل بـ + اسم الشخص» سيبحث التطبيق في جهات الاتصال، ثم يبدأ الاتصال بعد منح الإذن. الرسائل تفتح شاشة الرسائل لتراجعها وترسلها بنفسك.",14,Color.GRAY));
         card(text("استشعار الحركة يعمل كخيار داخل التطبيق فقط حالياً. تشغيل التطبيق تلقائياً وهو مغلق بسبب الحركة يحتاج خدمة خلفية دائمة وقد يستهلك البطارية، لذلك لم أفعّله دون موافقتك.",14,Color.GRAY));
     }
-    private void openPermissionSettings(String permission) {\n        openAppSettings();\n        toast("من صفحة أذونات التطبيق اختَر الإذن المطلوب ثم اسمح أو ارفض");\n    }\n    private void openAppSettings() {
+    private void openPermissionSettings(String permission) {
+        openAppSettings();
+        toast("من صفحة أذونات التطبيق اختَر الإذن المطلوب ثم اسمح أو ارفض");
+    }
+    private void openAppSettings() {
         Intent i=new Intent("android.settings.APPLICATION_DETAILS_SETTINGS",Uri.parse("package:"+getPackageName())); startActivity(i);
     }
     private String findPhone(String wanted) {
@@ -154,7 +158,8 @@ public class MainActivity extends Activity {
             else toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف.");
         }
     }
-    private void startVoiceInput() {\n        if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("assistant_enabled",true)) { toast("الأوامر الصوتية متوقفة من الإعدادات"); return; }
+    private void startVoiceInput() {
+        if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("assistant_enabled",true)) { toast("الأوامر الصوتية متوقفة من الإعدادات"); return; }
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, 72);
             toast("اسمح باستخدام الميكروفون، ثم اضغط زر التحدث مرة أخرى");
@@ -192,13 +197,15 @@ public class MainActivity extends Activity {
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = command.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {\n            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
+        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {
+            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
             String person=command.replaceFirst("^(اتصل|كلم)\\s*(ب|على|مع)?\\s*","").trim();
             if(person.isEmpty()) speak("قولي اسم الشخص، مثلاً اتصل بعبد الباري");
             else requestContactAction(person,false);
             return;
         }
-        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {\n            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("sms_enabled",true)) { speak("ميزة الرسائل متوقفة من الإعدادات"); return; }
+        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {
+            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("sms_enabled",true)) { speak("ميزة الرسائل متوقفة من الإعدادات"); return; }
             String rest=command.replaceFirst("^(ابعث|أرسل|ارسل)\\s*رسالة\\s*(إلى|الى|ل)?\\s*","").trim();
             int split=rest.indexOf(" نصها ");
             if(split<1) split=rest.indexOf(" نص ");
@@ -267,6 +274,7 @@ public class MainActivity extends Activity {
         if ("today".equals(tab)) showToday();
         else if ("tasks".equals(tab)) showTasks();
         else if ("reminders".equals(tab)) showReminders();
+        else if ("settings".equals(tab)) showSettings();
         else if ("settings".equals(tab)) showSettings();
         else showNotes();
     }
