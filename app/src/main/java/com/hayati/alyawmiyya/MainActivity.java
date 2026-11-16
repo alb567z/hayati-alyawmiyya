@@ -249,7 +249,7 @@ public class MainActivity extends Activity {
         String kind = task ? "مهمه" : note ? "ملاحظه" : "تذكير";
         String query = lower.replaceAll(".*?(?:احذف|امسح|الغ|الغي|الغاء|كنسل|بطل)\\s*", "");
         query = query.replaceFirst("^(?:لي\\s*)?(?:اخر|الاخير|الاخيره|كل|هذا|هذي)?\\s*", "");
-        query = query.replaceFirst("^" + kind + "(?:\\s*رقم\\s*\\d+)?\\s*", "").trim();
+        query = query.replaceFirst("^(?:ال)?" + kind + "(?:\\s*رقم\\s*\\d+)?\\s*", "").trim();
         query = query.replaceFirst("^(?:اللي\\s*)", "").trim();
 
         if (task) {
@@ -362,15 +362,15 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل).*مهمه.*")
+        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب).*مهمه.*")
                 || lower.startsWith("مهمه جديده")) {
-            String title = lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل)?\\s*مهمه(?: جديده)?\\s*", "").trim();
+            String title = lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب)?\\s*مهمه(?: جديده)?\\s*", "").trim();
             if (title.isEmpty()) { speak("شن هي المهمة اللي تبي نزيدهالك؟ مثلاً: زيدلي مهمة نشري أغراض البيت."); return; }
             JSONObject o=new JSONObject(); put(o,"title",title); put(o,"done",false); tasks.put(o); saveData(); showTab("tasks");
             speak("تمام، زدتلك المهمة: " + title); return;
         }
-        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل).*ملاحظه.*")) {
-            String body=lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل)?\\s*ملاحظه\\s*", "").trim();
+        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب|دون|خزن).*ملاحظه.*")) {
+            String body=lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب|دون|خزن)?\\s*ملاحظه\\s*", "").trim();
             if (body.isEmpty()) { speak("شن تبي نكتبلك في الملاحظة؟"); return; }
             JSONObject o=new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes");
             speak("تمام، خزّنتلك الملاحظة."); return;
