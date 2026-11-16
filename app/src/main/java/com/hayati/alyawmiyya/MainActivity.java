@@ -1,6 +1,8 @@
 package com.hayati.alyawmiyya;
 
 import android.app.*;
+import android.media.MediaRecorder;
+import java.io.File;
 import android.content.*;
 import android.net.Uri;
 import android.database.Cursor;
@@ -36,6 +38,12 @@ public class MainActivity extends Activity {
     private boolean pendingSms = false;
     private String pendingSmsBody = "";
     private String pendingCallNumber = "";
+    private MediaRecorder enrollmentRecorder;
+    private AlertDialog enrollmentDialog;
+    private TextView enrollmentStatus;
+    private Button enrollmentButton;
+    private int enrollmentSample = 1;
+    private boolean enrollmentRecording = false;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -186,6 +194,116 @@ public class MainActivity extends Activity {
             }
         }
     }
+    // First-use voice sample setup. Audio remains in this app's private files directory.
+    // These samples are NOT speaker authentication; the current speech recognizer
+    // still accepts anyone who can speak into the microphone.
+    private void showVoiceEnrollment() {
+        enrollmentSample = 1;
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(24, 12, 24, 8);
+        TextView instruction = text("اقرأ العبارة التالية بصوتك في مكان هادئ. سنحفظ ثلاث عينات داخل مساحة التطبيق الخاصة على هاتفك.\\n\\n«أنا صاحب الهاتف، وهذا صوتي. يا صاحبي، اسمعني وتعرّف على صوتي، واستجب لأوامري أنا».", 17, ink);
+        panel.addView(instruction);
+        enrollmentStatus = text("العينة 1 من 3: اضغط ابدأ التسجيل، ثم اقرأ العبارة واضغط إيقاف وحفظ.", 14, teal);
+        panel.addView(enrollmentStatus);
+        enrollmentButton = new Button(this);
+        enrollmentButton.setAllCaps(false);
+        enrollmentButton.setText("ابدأ التسجيل 1/3");
+        panel.addView(enrollmentButton);
+        enrollmentDialog = new AlertDialog.Builder(this)
+            .setTitle("التعرّف الأولي على صوتك")
+            .setView(panel)
+            .setNegativeButton("لاحقاً", (d, w) -> cancelEnrollment())
+            .setOnCancelListener(d -> cancelEnrollment())
+            .create();
+        enrollmentButton.setOnClickListener(v -> {
+            if (!enrollmentRecording) beginEnrollmentRecording();
+            else saveEnrollmentRecording();
+        });
+        enrollmentDialog.show();
+    }
+
+    private File enrollmentDirectory() {
+        File dir = new File(getFilesDir(), "voice_samples");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private void beginEnrollmentRecording() {
+        try {
+            File output = new File(enrollmentDirectory(), "voice_sample_" + enrollmentSample + ".m4a");
+            if (output.exists()) output.delete();
+            if (Build.VERSION.SDK_INT >= 31) enrollmentRecorder = new MediaRecorder(this);
+            else enrollmentRecorder = new MediaRecorder();
+            enrollmentRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            enrollmentRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            enrollmentRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            enrollmentRecorder.setAudioEncodingBitRate(96000);
+            enrollmentRecorder.setAudioSamplingRate(44100);
+            enrollmentRecorder.setOutputFile(output.getAbsolutePath());
+            enrollmentRecorder.prepare();
+            enrollmentRecorder.start();
+            enrollmentRecording = true;
+            enrollmentButton.setText("إيقاف وحفظ العينة " + enrollmentSample);
+            enrollmentStatus.setText("جاري التسجيل… اقرأ العبارة كاملة ثم اضغط إيقاف وحفظ.");
+        } catch (Exception e) {
+            releaseEnrollmentRecorder();
+            enrollmentRecording = false;
+            toast("تعذر بدء التسجيل. تأكد من إذن الميكروفون ثم حاول مرة أخرى.");
+        }
+    }
+
+    private void saveEnrollmentRecording() {
+        File saved = new File(enrollmentDirectory(), "voice_sample_" + enrollmentSample + ".m4a");
+        try {
+            if (enrollmentRecorder != null) enrollmentRecorder.stop();
+            if (saved.length() < 1024) {
+                saved.delete();
+                toast("التسجيل قصير جداً. أعد العينة من فضلك.");
+                return;
+            }
+        } catch (Exception e) {
+            saved.delete();
+            toast("لم يكتمل التسجيل. أعد المحاولة.");
+            releaseEnrollmentRecorder();
+            enrollmentRecording = false;
+            enrollmentButton.setText("أعد تسجيل العينة " + enrollmentSample);
+            return;
+        } finally {
+            releaseEnrollmentRecorder();
+            enrollmentRecording = false;
+        }
+        if (enrollmentSample < 3) {
+            enrollmentSample++;
+            enrollmentButton.setText("ابدأ التسجيل " + enrollmentSample + "/3");
+            enrollmentStatus.setText("تم حفظ العينة. خذ نفساً، ثم اقرأ العبارة مرة أخرى.");
+        } else {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putBoolean("voice_setup_completed", true)
+                .putInt("voice_sample_count", 3)
+                .apply();
+            if (enrollmentDialog != null) enrollmentDialog.dismiss();
+            toast("تم حفظ عينات صوتك على الهاتف. هذه تهيئة أولية وليست تحققاً بيومترياً من الهوية.");
+            startVoiceInput();
+        }
+    }
+
+    private void releaseEnrollmentRecorder() {
+        if (enrollmentRecorder != null) {
+            try { enrollmentRecorder.reset(); } catch (Exception ignored) {}
+            try { enrollmentRecorder.release(); } catch (Exception ignored) {}
+            enrollmentRecorder = null;
+        }
+    }
+
+    private void cancelEnrollment() {
+        if (enrollmentRecording) {
+            try { if (enrollmentRecorder != null) enrollmentRecorder.stop(); } catch (Exception ignored) {}
+        }
+        releaseEnrollmentRecorder();
+        enrollmentRecording = false;
+    }
+
     private void startVoiceInput() {
         if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("assistant_enabled",true)) { toast("الأوامر الصوتية متوقفة من الإعدادات"); return; }
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -194,6 +312,10 @@ public class MainActivity extends Activity {
             return;
         }
         if (!getPackageManager().hasSystemFeature("android.hardware.microphone")) { toast("الميكروفون غير متاح على هذا الهاتف"); return; }
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("voice_setup_completed", false)) {
+            showVoiceEnrollment();
+            return;
+        }
         try {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
