@@ -3,6 +3,7 @@ package com.hayati.alyawmiyya;
 import android.app.*;
 import android.content.*;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -56,10 +57,10 @@ public class MainActivity extends Activity {
     private void buildShell() {
         root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.rgb(246,248,250));
         setContentView(root);
-        LinearLayout header = new LinearLayout(this); header.setPadding(22,20,22,18); header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setBackgroundColor(teal); header.setOrientation(LinearLayout.VERTICAL);
-        TextView brand = new TextView(this); brand.setText("حياتي اليومية  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(24); brand.setGravity(Gravity.RIGHT);
-        TextView sub = new TextView(this); sub.setText("رتّب يومك، خطوة بخطوة"); sub.setTextColor(Color.rgb(220,245,240)); sub.setTextSize(14); sub.setGravity(Gravity.RIGHT);
+        LinearLayout header = new LinearLayout(this); header.setPadding(22,22,22,20); header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{Color.rgb(0,105,92), Color.rgb(0,150,136)})); header.setOrientation(LinearLayout.VERTICAL);
+        TextView brand = new TextView(this); brand.setText("حياتي اليومية  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(26); brand.setTypeface(null, android.graphics.Typeface.BOLD); brand.setGravity(Gravity.RIGHT);
+        TextView sub = new TextView(this); sub.setText("مساحتك لتنظيم يومك بكل سهولة"); sub.setTextColor(Color.rgb(220,245,240)); sub.setTextSize(14); sub.setGravity(Gravity.RIGHT);
         header.addView(brand); header.addView(sub); root.addView(header);
         ScrollView scroll = new ScrollView(this); content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(16,16,16,22);
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
@@ -172,12 +173,13 @@ public class MainActivity extends Activity {
         if(hint!=null) content.addView(text(hint,14,Color.GRAY));
     }
     private Button button(String label, Runnable action) {
-        Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextColor(Color.WHITE); b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(teal));
+        Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextColor(Color.WHITE); b.setTypeface(null, android.graphics.Typeface.BOLD); b.setBackground(roundDrawable(teal,16));
         b.setOnClickListener(v->action.run()); return b;
     }
+    private GradientDrawable roundDrawable(int color, int radiusDp) { GradientDrawable d=new GradientDrawable(); d.setColor(color); d.setCornerRadius(radiusDp*getResources().getDisplayMetrics().density); return d; }
     private void card(View v) {
         LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(12,8,12,8);
-        box.setBackgroundColor(Color.WHITE); box.addView(v); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,6,0,6); content.addView(box,lp);
+        box.setBackground(roundDrawable(Color.WHITE,18)); box.setElevation(3f); box.addView(v); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,7,0,7); content.addView(box,lp);
     }
     private void showToday() {
         String date=new SimpleDateFormat("EEEE، d MMMM yyyy",new Locale("ar")).format(new Date());
