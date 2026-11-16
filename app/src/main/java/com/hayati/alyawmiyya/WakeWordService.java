@@ -114,7 +114,21 @@ public class WakeWordService extends Service {
             } else handler.postDelayed(restart,500);
             return;
         }
+
         waiting=false;
+        String mediaAction=null;
+        if(heard.matches(".*(?:ارفع|علي|زيد).*صوت.*")) mediaAction="volume_up";
+        else if(heard.matches(".*(?:وطي|نقص|خفض).*صوت.*")) mediaAction="volume_down";
+        else if(heard.matches(".*(?:التالي|الاغنيه الجايه|الفيديو الجاي|المقطع التالي).*")) mediaAction="next";
+        else if(heard.matches(".*(?:السابق|اللي قبل|الاغنيه السابقه|الفيديو السابق).*")) mediaAction="previous";
+        else if(heard.matches(".*(?:وقف|اوقف|ايقاف|حبس|توقف).*")) mediaAction="play_pause";
+        else if(heard.matches(".*(?:كمل|استمر|شغل الموسيقى|شغل الفيديو|شغل الفيلم|واصل).*")) mediaAction="play_pause";
+        if(mediaAction!=null) {
+            if(!NotificationReaderService.hasAccess(this)) say("فعّل إذن الإشعارات لصاحبي حتى نتحكم في الفيديو والموسيقى.");
+            else if(NotificationReaderService.controlMedia(this,mediaAction)) say("حاضر يا صاحبي.");
+            else say("ما لقيتش مشغل نشط أو التطبيق ما يدعمش الأمر.");
+            return;
+        }
         if(heard.contains("الساعه") || heard.contains("كم ساعه") || heard.contains("الوقت")) {
             String time=new SimpleDateFormat("h:mm a",new Locale("ar","LY")).format(new Date());
             say("الساعة توا "+time);
