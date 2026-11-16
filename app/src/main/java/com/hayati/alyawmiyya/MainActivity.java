@@ -83,6 +83,18 @@ public class MainActivity extends Activity {
         android.content.SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);
         Switch voice=new Switch(this); voice.setText("الردود الصوتية"); voice.setTextSize(17); voice.setChecked(p.getBoolean("voice_enabled",true));
         voice.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("voice_enabled",on).apply()); card(voice);
+        Switch assistant=new Switch(this); assistant.setText("تشغيل الأوامر الصوتية بالميكروفون"); assistant.setTextSize(17); assistant.setChecked(p.getBoolean("assistant_enabled",true));
+        assistant.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("assistant_enabled",on).apply()); card(assistant);
+        Switch calls=new Switch(this); calls.setText("السماح بميزة الاتصال"); calls.setTextSize(17); calls.setChecked(p.getBoolean("calls_enabled",true));
+        calls.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("calls_enabled",on).apply()); card(calls);
+        Switch sms=new Switch(this); sms.setText("السماح بميزة الرسائل"); sms.setTextSize(17); sms.setChecked(p.getBoolean("sms_enabled",true));
+        sms.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("sms_enabled",on).apply()); card(sms);
+        Switch notifications=new Switch(this); notifications.setText("تفعيل تنبيهات التطبيق"); notifications.setTextSize(17); notifications.setChecked(p.getBoolean("notifications_enabled",true));
+        notifications.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("notifications_enabled",on).apply()); card(notifications);
+        content.addView(button("🎙️ إذن الميكروفون",()->openPermissionSettings("android.permission.RECORD_AUDIO")));
+        content.addView(button("📇 إذن جهات الاتصال",()->openPermissionSettings("android.permission.READ_CONTACTS")));
+        content.addView(button("📞 إذن إجراء المكالمات",()->openPermissionSettings("android.permission.CALL_PHONE")));
+        content.addView(button("🔔 إذن الإشعارات",()->openAppSettings()));
         Switch motion=new Switch(this); motion.setText("استشعار حركة الهاتف أثناء فتح التطبيق"); motion.setTextSize(16); motion.setChecked(p.getBoolean("motion_enabled",false));
         motion.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("motion_enabled",on).apply()); card(motion);
         content.addView(button("🎙️ إعداد إذن الميكروفون",()->openAppSettings()));
@@ -92,7 +104,7 @@ public class MainActivity extends Activity {
         card(text("الاتصال: عند قول «اتصل بـ + اسم الشخص» سيبحث التطبيق في جهات الاتصال، ثم يبدأ الاتصال بعد منح الإذن. الرسائل تفتح شاشة الرسائل لتراجعها وترسلها بنفسك.",14,Color.GRAY));
         card(text("استشعار الحركة يعمل كخيار داخل التطبيق فقط حالياً. تشغيل التطبيق تلقائياً وهو مغلق بسبب الحركة يحتاج خدمة خلفية دائمة وقد يستهلك البطارية، لذلك لم أفعّله دون موافقتك.",14,Color.GRAY));
     }
-    private void openAppSettings() {
+    private void openPermissionSettings(String permission) {\n        openAppSettings();\n        toast("من صفحة أذونات التطبيق اختَر الإذن المطلوب ثم اسمح أو ارفض");\n    }\n    private void openAppSettings() {
         Intent i=new Intent("android.settings.APPLICATION_DETAILS_SETTINGS",Uri.parse("package:"+getPackageName())); startActivity(i);
     }
     private String findPhone(String wanted) {
@@ -142,7 +154,7 @@ public class MainActivity extends Activity {
             else toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف.");
         }
     }
-    private void startVoiceInput() {
+    private void startVoiceInput() {\n        if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("assistant_enabled",true)) { toast("الأوامر الصوتية متوقفة من الإعدادات"); return; }
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{"android.permission.RECORD_AUDIO"}, 72);
             toast("اسمح باستخدام الميكروفون، ثم اضغط زر التحدث مرة أخرى");
@@ -180,13 +192,13 @@ public class MainActivity extends Activity {
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = command.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {
+        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {\n            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
             String person=command.replaceFirst("^(اتصل|كلم)\\s*(ب|على|مع)?\\s*","").trim();
             if(person.isEmpty()) speak("قولي اسم الشخص، مثلاً اتصل بعبد الباري");
             else requestContactAction(person,false);
             return;
         }
-        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {
+        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {\n            if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("sms_enabled",true)) { speak("ميزة الرسائل متوقفة من الإعدادات"); return; }
             String rest=command.replaceFirst("^(ابعث|أرسل|ارسل)\\s*رسالة\\s*(إلى|الى|ل)?\\s*","").trim();
             int split=rest.indexOf(" نصها ");
             if(split<1) split=rest.indexOf(" نص ");
