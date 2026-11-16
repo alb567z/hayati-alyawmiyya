@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(0, 105, 92));
         getWindow().setNavigationBarColor(Color.rgb(250, 250, 250));
         loadData();
-        tts = new TextToSpeech(this, status -> { if (status == TextToSpeech.SUCCESS) tts.setLanguage(new Locale("ar", "LY")); });
+        tts = new TextToSpeech(this, status -> { if (status == TextToSpeech.SUCCESS) { tts.setLanguage(new Locale("ar", "LY")); applyVoiceSettings(tts); } });
         createNotificationChannel();
         requestNotificationPermission();
         buildShell();
@@ -94,6 +94,33 @@ public class MainActivity extends Activity {
         android.content.SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);
         Switch voice=new Switch(this); voice.setText("الردود الصوتية"); voice.setTextSize(17); voice.setChecked(p.getBoolean("voice_enabled",true));
         voice.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("voice_enabled",on).apply()); card(voice);
+
+        card(text("نبرة الصوت",17,ink));
+        RadioGroup pitchGroup = new RadioGroup(this);
+        pitchGroup.setOrientation(RadioGroup.VERTICAL);
+        String[] pitchLabels = {"حاد","متوسط","غليظ"};
+        float[] pitchValues = {1.15f,1.0f,0.85f};
+        int selectedPitch = Math.round(p.getFloat("voice_pitch",1.0f)*100);
+        int selectedId = 2;
+        for (int i=0;i<pitchLabels.length;i++) {
+            RadioButton option = new RadioButton(this);
+            option.setId(i+1);
+            option.setText(pitchLabels[i]);
+            option.setTextSize(16);
+            pitchGroup.addView(option);
+            if (Math.abs(selectedPitch-Math.round(pitchValues[i]*100))<2) selectedId=i+1;
+        }
+        pitchGroup.check(selectedId);
+        pitchGroup.setOnCheckedChangeListener((group,checkedId)->{
+            if(checkedId>=1 && checkedId<=3) {
+                float chosen = pitchValues[checkedId-1];
+                p.edit().putFloat("voice_pitch",chosen).apply();
+                applyVoiceSettings(tts);
+            }
+        });
+        card(pitchGroup);
+        content.addView(button("🔊 تجربة الصوت",()->speak("نعم يا صاحبي، هذا اختبار للصوت المتوسط.")));
+        card(text("اخترنا النبرة المتوسطة افتراضياً. درجة الصوت الفعلية تعتمد أيضاً على الأصوات العربية المثبتة في الهاتف؛ تغيير النبرة لا يضمن تحويل صوت المحرك إلى صوت رجالي إذا لم يتوفر صوت رجالي.",13,Color.GRAY));
         Switch assistant=new Switch(this); assistant.setText("تشغيل الأوامر الصوتية بالميكروفون"); assistant.setTextSize(17); assistant.setChecked(p.getBoolean("assistant_enabled",true));
         assistant.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("assistant_enabled",on).apply()); card(assistant);
         Switch wake=new Switch(this);
@@ -378,9 +405,19 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void applyVoiceSettings(TextToSpeech engine) {
+        if (engine == null) return;
+        float pitch = getSharedPreferences(PREFS,MODE_PRIVATE).getFloat("voice_pitch",1.0f);
+        engine.setPitch(pitch);
+        engine.setSpeechRate(1.0f);
+    }
+
     private void speak(String message) {
         toast(message);
-        if (tts != null && getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("voice_enabled",true)) tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "hayati_voice");
+        if (tts != null && getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("voice_enabled",true)) {
+            applyVoiceSettings(tts);
+            tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "hayati_voice");
+        }
     }
 
     private String cleanVoice(String value) {
