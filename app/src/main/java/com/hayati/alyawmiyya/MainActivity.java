@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
         header.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{Color.rgb(0,105,92), Color.rgb(0,150,136)})); header.setOrientation(LinearLayout.VERTICAL);
         TextView brand = new TextView(this); brand.setText("حياتي اليومية  ♥"); brand.setTextColor(Color.WHITE); brand.setTextSize(26); brand.setTypeface(null, android.graphics.Typeface.BOLD); brand.setGravity(Gravity.RIGHT);
         TextView sub = new TextView(this); sub.setText("مساحتك لتنظيم يومك بكل سهولة"); sub.setTextColor(Color.rgb(220,245,240)); sub.setTextSize(14); sub.setGravity(Gravity.RIGHT);
-        header.addView(brand); header.addView(sub); root.addView(header);
+        header.addView(brand); header.addView(sub); Button voice = new Button(this); voice.setText("🎤 تحدث إلى حياتي اليومية"); voice.setAllCaps(false); voice.setTextSize(15); voice.setTextColor(Color.rgb(0,105,92)); voice.setBackground(roundDrawable(Color.WHITE,18)); voice.setOnClickListener(v -> startVoiceInput()); LinearLayout.LayoutParams voiceLp = new LinearLayout.LayoutParams(-1, -2); voiceLp.topMargin = 12; header.addView(voice, voiceLp); root.addView(header);
         ScrollView scroll = new ScrollView(this); content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(16,16,16,22);
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
         nav = new LinearLayout(this); nav.setPadding(4,8,4,8); nav.setBackgroundColor(Color.WHITE); root.addView(nav);
