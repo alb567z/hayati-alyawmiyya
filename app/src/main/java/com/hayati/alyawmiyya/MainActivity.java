@@ -119,7 +119,8 @@ public class MainActivity extends Activity {
             }
         });
         card(pitchGroup);
-        content.addView(button("🔊 تجربة الصوت",()->speak("نعم يا صاحبي، هذا اختبار للصوت المتوسط.")));
+        content.addView(button("👨 اختيار الصوت الرجالي",()->chooseArabicVoice()));
+        content.addView(button("🔊 تجربة الصوت",()->speak("نعم يا صاحبي، هذا اختبار للصوت.")));
         card(text("اخترنا النبرة المتوسطة افتراضياً. درجة الصوت الفعلية تعتمد أيضاً على الأصوات العربية المثبتة في الهاتف؛ تغيير النبرة لا يضمن تحويل صوت المحرك إلى صوت رجالي إذا لم يتوفر صوت رجالي.",13,Color.GRAY));
         Switch assistant=new Switch(this); assistant.setText("تشغيل الأوامر الصوتية بالميكروفون"); assistant.setTextSize(17); assistant.setChecked(p.getBoolean("assistant_enabled",true));
         assistant.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("assistant_enabled",on).apply()); card(assistant);
@@ -405,9 +406,60 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void chooseArabicVoice() {
+        if (tts == null || tts.getVoices() == null) {
+            toast("محرك الصوت ما زال يجهز. حاول بعد لحظة.");
+            return;
+        }
+        ArrayList<android.speech.tts.Voice> voices = new ArrayList<>();
+        for (android.speech.tts.Voice voice : tts.getVoices()) {
+            if (voice != null && voice.getLocale() != null
+                && "ar".equalsIgnoreCase(voice.getLocale().getLanguage())
+                && !voice.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)) {
+                voices.add(voice);
+            }
+        }
+        if (voices.isEmpty()) {
+            new AlertDialog.Builder(this).setTitle("لا يوجد صوت عربي إضافي")
+                .setMessage("الهاتف لا يعرض أصواتاً عربية متاحة للاختيار. افتح إعدادات تحويل النص إلى كلام وثبّت صوتاً عربياً رجاليّاً إن كان متوفراً، ثم ارجع للتطبيق.")
+                .setPositiveButton("إعدادات الصوت",(d,w)->{
+                    try { startActivity(new Intent("com.android.settings.TTS_SETTINGS")); }
+                    catch(Exception e) { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
+                }).setNegativeButton("إغلاق",null).show();
+            return;
+        }
+        Collections.sort(voices, (a,b)->a.getName().compareToIgnoreCase(b.getName()));
+        String[] names = new String[voices.size()];
+        String selected = getSharedPreferences(PREFS,MODE_PRIVATE).getString("voice_name","");
+        int checked = -1;
+        for (int i=0;i<voices.size();i++) {
+            names[i] = voices.get(i).getName() + " (" + voices.get(i).getLocale().toLanguageTag() + ")";
+            if (voices.get(i).getName().equals(selected)) checked=i;
+        }
+        new AlertDialog.Builder(this).setTitle("اختبر الأصوات العربية واختر صوتاً رجاليّاً")
+            .setSingleChoiceItems(names,checked,(dialog,which)->{
+                android.speech.tts.Voice chosen=voices.get(which);
+                getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString("voice_name",chosen.getName()).apply();
+                applyVoiceSettings(tts);
+                tts.speak("نعم يا صاحبي، هذا صوتي الجديد.",TextToSpeech.QUEUE_FLUSH,null,"voice-choice");
+                dialog.dismiss();
+                toast("تم اختيار الصوت. جرّبه وتأكد أنه رجالي.");
+            }).setNegativeButton("إغلاق",null).show();
+    }
+
     private void applyVoiceSettings(TextToSpeech engine) {
         if (engine == null) return;
-        float pitch = getSharedPreferences(PREFS,MODE_PRIVATE).getFloat("voice_pitch",1.0f);
+        android.content.SharedPreferences prefs=getSharedPreferences(PREFS,MODE_PRIVATE);
+        String voiceName=prefs.getString("voice_name","");
+        if (!voiceName.isEmpty() && engine.getVoices()!=null) {
+            for (android.speech.tts.Voice voice : engine.getVoices()) {
+                if (voice!=null && voiceName.equals(voice.getName())) {
+                    try { engine.setVoice(voice); } catch(Exception ignored) {}
+                    break;
+                }
+            }
+        }
+        float pitch = prefs.getFloat("voice_pitch",1.0f);
         engine.setPitch(pitch);
         engine.setSpeechRate(1.0f);
     }
