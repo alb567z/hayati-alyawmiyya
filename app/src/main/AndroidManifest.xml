@@ -5,6 +5,8 @@
     <application
         android:allowBackup="true"
         android:label="حياتي اليومية"
+        android:icon="@drawable/ic_hayati_launcher"
+        android:roundIcon="@drawable/ic_hayati_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
