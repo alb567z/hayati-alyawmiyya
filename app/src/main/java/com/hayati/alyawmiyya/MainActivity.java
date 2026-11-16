@@ -202,7 +202,7 @@ public class MainActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(24, 12, 24, 8);
-        TextView instruction = text("اقرأ العبارة التالية بصوتك في مكان هادئ. سنحفظ ثلاث عينات داخل مساحة التطبيق الخاصة على هاتفك.\\n\\n«أنا صاحب الهاتف، وهذا صوتي. يا صاحبي، اسمعني وتعرّف على صوتي، واستجب لأوامري أنا».", 17, ink);
+        TextView instruction = text("اقرأ العبارة التالية بصوتك في مكان هادئ. سنحفظ ثلاث عينات داخل مساحة التطبيق الخاصة على هاتفك.\n\n«أنا صاحب الهاتف، وهذا صوتي. يا صاحبي، اسمعني وتعرّف على صوتي، واستجب لأوامري أنا».", 17, ink);
         panel.addView(instruction);
         enrollmentStatus = text("العينة 1 من 3: اضغط ابدأ التسجيل، ثم اقرأ العبارة واضغط إيقاف وحفظ.", 14, teal);
         panel.addView(enrollmentStatus);
