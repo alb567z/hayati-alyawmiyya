@@ -144,13 +144,41 @@ public class WakeWordService extends Service {
         } else if (heard.contains("ملاحظ") || heard.contains("مذكرات")) {
             say(readSavedItems("notes", "ملاحظاتك", false));
         } else if (heard.contains("مهم") || heard.contains("حاجات بندير") || heard.contains("شن عندي")) {
-            if (heard.contains("موعد") || heard.contains("مواعيد")) say(readSavedItems("reminders", "مواعيدك", heard.contains("غدوة") || heard.contains("بكره") || heard.contains("بكرة") || heard.contains("غدا")));
+            boolean tomorrow = heard.contains("غدوة") || heard.contains("بكره") || heard.contains("بكرة") || heard.contains("غدا");
+            if (tomorrow && !heard.contains("ملاحظ") && !heard.contains("موعد") && !heard.contains("مواعيد")) say(readTomorrowOverview());
+            else if (heard.contains("موعد") || heard.contains("مواعيد")) say(readSavedItems("reminders", "مواعيدك", tomorrow));
             else if (heard.contains("ملاحظ")) say(readSavedItems("notes", "ملاحظاتك", false));
             else say(readSavedItems("tasks", "مهامك", false));
         } else if (heard.contains("موعد") || heard.contains("مواعيد") || heard.contains("تذكير")) {
             boolean tomorrow = heard.contains("غدوة") || heard.contains("بكره") || heard.contains("بكرة") || heard.contains("غدا");
             say(readSavedItems("reminders", "مواعيدك", tomorrow));
         } else say("نقدر نجاوبك عن الساعة والإشعارات والمهام والملاحظات والمواعيد المحفوظة.");
+    }
+
+    private String readTomorrowOverview() {
+        Calendar target = Calendar.getInstance();
+        target.add(Calendar.DAY_OF_YEAR, 1);
+        String date = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(target.getTime());
+        ArrayList<String> lines = new ArrayList<>();
+        try {
+            org.json.JSONArray tasks = new org.json.JSONArray(getSharedPreferences("hayati_data", MODE_PRIVATE).getString("tasks", "[]"));
+            for (int i = 0; i < tasks.length(); i++) {
+                org.json.JSONObject item = tasks.optJSONObject(i);
+                if (item != null && !item.optBoolean("done", false) && !item.optString("title", "").trim().isEmpty())
+                    lines.add("مهمة: " + item.optString("title"));
+            }
+            org.json.JSONArray reminders = new org.json.JSONArray(getSharedPreferences("hayati_data", MODE_PRIVATE).getString("reminders", "[]"));
+            for (int i = 0; i < reminders.length(); i++) {
+                org.json.JSONObject item = reminders.optJSONObject(i);
+                if (item == null) continue;
+                String when = item.optString("when", "");
+                if (when.startsWith(date)) lines.add("موعد: " + item.optString("title") + (when.length() >= 18 ? " الساعة " + when.substring(12).trim() : ""));
+            }
+        } catch (Exception ignored) { return "ما قدرتش نقرأ جدول غدوة توا."; }
+        if (lines.isEmpty()) return "ما عندكش مهام أو مواعيد مسجلة غدوة.";
+        StringBuilder answer = new StringBuilder("غدوة عندك: ");
+        for (int i = 0; i < lines.size(); i++) { if (i > 0) answer.append("، "); answer.append(lines.get(i)); }
+        return answer.toString();
     }
 
     private String readSavedItems(String key, String label, boolean tomorrowOnly) {
