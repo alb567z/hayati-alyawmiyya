@@ -28,6 +28,7 @@ public class WakeWordService extends Service {
         tts=new TextToSpeech(this,status->{
             if(status==TextToSpeech.SUCCESS) {
                 tts.setLanguage(new Locale("ar","LY"));
+                applyVoiceSettings();
                 ttsReady=true;
             }
         });
@@ -136,7 +137,16 @@ public class WakeWordService extends Service {
             @Override public void onDone(String id) { handler.post(()->{ if(active) handler.postDelayed(restart,500); }); }
             @Override public void onError(String id) { handler.postDelayed(restart,1000); }
         });
+        applyVoiceSettings();
         tts.speak(message,TextToSpeech.QUEUE_FLUSH,null,"sahbi-"+System.currentTimeMillis());
+    }
+
+    private void applyVoiceSettings() {
+        if (tts == null) return;
+        android.content.SharedPreferences prefs = getSharedPreferences("hayati_data",MODE_PRIVATE);
+        float pitch = prefs.getFloat("voice_pitch",1.0f);
+        tts.setPitch(pitch);
+        tts.setSpeechRate(1.0f);
     }
 
     private void stopListeningService() {
