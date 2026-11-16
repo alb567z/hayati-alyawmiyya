@@ -147,7 +147,8 @@ public class MainActivity extends Activity {
             put(old,"title",title.getText().toString());put(old,"body",body.getText().toString());saveData();showTab("notes");
         }).show();
     }
-    private void inputDialog(String title,String hint, java.util.function.Consumer<String> done) {
+    private interface TextAction { void accept(String value); }
+    private void inputDialog(String title,String hint, TextAction done) {
         EditText input=new EditText(this);input.setHint(hint);
         new AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("إلغاء",null).setPositiveButton("حفظ",(d,w)->{
             String s=input.getText().toString().trim();if(!s.isEmpty())done.accept(s);
