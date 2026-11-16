@@ -208,81 +208,107 @@ public class MainActivity extends Activity {
             .replace("ـ", "").replaceAll("[\\u064B-\\u065F\\u0670]", "");
     }
 
+    private String normalizeVoiceText(String value) {
+        if (value == null) return "";
+        String s = cleanVoice(value).toLowerCase(Locale.ROOT)
+            .replace("أ","ا").replace("إ","ا").replace("آ","ا")
+            .replace("ى","ي").replace("ة","ه");
+        s = s.replaceAll("[؟?!,.،؛:]", " ").replaceAll("\\s+", " ").trim();
+        String[][] words = {
+            {"تسعه","9"},{"تسعة","9"},{"تسع","9"},{"ثمانيه","8"},{"ثمانية","8"},
+            {"ثمان","8"},{"سبعه","7"},{"سبعة","7"},{"سته","6"},{"ستة","6"},
+            {"خمسه","5"},{"خمسة","5"},{"اربعه","4"},{"أربعة","4"},{"ثلاثه","3"},
+            {"ثلاثة","3"},{"اثنين","2"},{"اتنين","2"},{"واحد","1"},{"عشره","10"},
+            {"عشرة","10"},{"حداش","11"},{"احدعش","11"},{"اثناش","12"},{"اثنعش","12"}
+        };
+        for (String[] pair : words) s = s.replaceAll("(?<!\\S)" + pair[0] + "(?!\\S)", pair[1]);
+        return s.replaceAll("\\s+", " ").trim();
+    }
+
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
-        String lower = command.toLowerCase(Locale.ROOT)
-            .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا");
-        command = command.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا");
-        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {
+        String lower = normalizeVoiceText(command);
+        if (lower.isEmpty()) { speak("ما وصلنيش كلام واضح. حاول مرة ثانية."); return; }
+
+        if (lower.matches(".*(?:اتصل|كلم|رن على|دق على).*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("calls_enabled",true)) { speak("ميزة الاتصال متوقفة من الإعدادات"); return; }
-            String person=command.replaceFirst("^(اتصل|كلم)\\s*(ب|على|مع)?\\s*","").trim();
-            if(person.isEmpty()) speak("قولي اسم الشخص، مثلاً اتصل بعبد الباري");
+            String person = lower.replaceFirst(".*?(?:اتصل|كلم|رن على|دق على)\\\\s*(?:ب|على|مع|ل)?\\\\s*", "").trim();
+            if (person.isEmpty()) speak("قولي اسم الشخص، مثلاً اتصل بعبد الباري");
             else requestContactAction(person,false);
             return;
         }
-        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {
+
+        if (lower.matches(".*(?:ابعث|ارسل|أرسل|دز).*رساله.*")) {
             if (!getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("sms_enabled",true)) { speak("ميزة الرسائل متوقفة من الإعدادات"); return; }
-            String rest=command.replaceFirst("^(ابعث|أرسل|ارسل)\\s*رسالة\\s*(إلى|الى|ل)?\\s*","").trim();
-            int split=rest.indexOf(" نصها ");
-            if(split<1) split=rest.indexOf(" نص ");
-            if(split<1) speak("قولي: ابعث رسالة إلى عبد الباري نصها السلام عليكم");
+            String rest = lower.replaceFirst(".*?(?:ابعث|ارسل|أرسل|دز)\\\\s*رساله\\\\s*(?:الى|ل)?\\\\s*", "");
+            int split = rest.indexOf(" نصها ");
+            if (split < 1) split = rest.indexOf(" نص ");
+            if (split < 1) speak("قولي: ابعث رسالة إلى عبد الباري نصها السلام عليكم");
             else {
-                String person=rest.substring(0,split).trim();
-                String body=rest.substring(split).replaceFirst("^\\s*نصها?\\s*","").trim();
+                String person = rest.substring(0,split).trim();
+                String body = rest.substring(split).replaceFirst("^\\\\s*نصها?\\\\s*", "").trim();
                 pendingContactName=person; pendingSms=true; pendingSmsBody=body;
-                if(checkSelfPermission("android.permission.READ_CONTACTS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)
+                if (checkSelfPermission("android.permission.READ_CONTACTS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)
                     requestPermissions(new String[]{"android.permission.READ_CONTACTS"},CONTACT_PERMISSION);
                 else performContactAction();
             }
             return;
         }
-        if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ") || lower.startsWith("ورّيني ")) {
+
+        if (lower.matches(".*(?:افتح|اعرض|وريني|ورني|شن عندي|شنو عندي).*")) {
             if (lower.contains("مهم")) { showTab("tasks"); speak("هذه قائمة المهام"); return; }
             if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذه ملاحظاتك"); return; }
             if (lower.contains("تذكير") || lower.contains("موعد")) { showTab("reminders"); speak("هذه تذكيراتك"); return; }
             if (lower.contains("اليوم")) { showTab("today"); speak("هذا ملخص يومك"); return; }
         }
-        if (lower.contains("كم") && (lower.contains("مهمة") || lower.contains("مهام"))) {
-            int done = 0; for (int i=0;i<tasks.length();i++) if (tasks.optJSONObject(i)!=null && tasks.optJSONObject(i).optBoolean("done")) done++;
+        if ((lower.contains("كم") || lower.contains("عدد")) && (lower.contains("مهمه") || lower.contains("مهام"))) {
+            int done=0;
+            for (int i=0;i<tasks.length();i++) if (tasks.optJSONObject(i)!=null && tasks.optJSONObject(i).optBoolean("done")) done++;
             speak("عندك " + tasks.length() + " مهام، أنجزت منها " + done); return;
         }
-        if (lower.startsWith("احذف") && lower.contains("آخر") && lower.contains("مهم")) {
+
+        if (lower.matches(".*(?:احذف|امسح).*") && lower.contains("اخر") && lower.contains("مهم")) {
             if (tasks.length()>0) { tasks.remove(tasks.length()-1); saveData(); showTab("tasks"); speak("حذفت آخر مهمة"); }
             else speak("ما عندكش مهام للحذف");
             return;
         }
-        if (lower.startsWith("احذف") && lower.contains("آخر") && lower.contains("ملاحظ")) {
+        if (lower.matches(".*(?:احذف|امسح).*") && lower.contains("اخر") && lower.contains("ملاحظ")) {
             if (notes.length()>0) { notes.remove(notes.length()-1); saveData(); showTab("notes"); speak("حذفت آخر ملاحظة"); }
             else speak("ما عندكش ملاحظات للحذف");
             return;
         }
-        if (lower.startsWith("اضف مهمة") || lower.startsWith("ضيف مهمة") || lower.startsWith("سجل مهمة") || lower.startsWith("مهمة جديدة")) {
-            String title = command.replaceFirst("^(اضف|ضيف|سجل)\\s*مهمة( جديدة)?\\s*", "").replaceFirst("^مهمة جديدة\\s*", "").trim();
-            if (title.isEmpty()) { speak("قولي اسم المهمة بعد كلمة أضف مهمة"); return; }
-            JSONObject o = new JSONObject(); put(o,"title",title); put(o,"done",false); tasks.put(o); saveData(); showTab("tasks"); speak("تمت إضافة المهمة: " + title); return;
+
+        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل).*مهمه.*")
+                || lower.startsWith("مهمه جديده")) {
+            String title = lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل)?\\\\s*مهمه(?: جديده)?\\\\s*", "").trim();
+            if (title.isEmpty()) { speak("شن المهمة اللي تبي نضيفها؟ قول مثلاً: نبي نضيف مهمة شراء أغراض البيت"); return; }
+            JSONObject o=new JSONObject(); put(o,"title",title); put(o,"done",false); tasks.put(o); saveData(); showTab("tasks");
+            speak("تمام، ضفت المهمة: " + title); return;
         }
-        if (lower.startsWith("اضف ملاحظة") || lower.startsWith("ضيف ملاحظة") || lower.startsWith("سجل ملاحظة")) {
-            String body = command.replaceFirst("^(اضف|ضيف|سجل)\\s*ملاحظة\\s*", "").trim();
-            if (body.isEmpty()) { speak("قولي نص الملاحظة بعد كلمة أضف ملاحظة"); return; }
-            JSONObject o = new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes"); speak("حفظت الملاحظة"); return;
+        if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل).*ملاحظه.*")) {
+            String body=lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل)?\\\\s*ملاحظه\\\\s*", "").trim();
+            if (body.isEmpty()) { speak("شن الملاحظة اللي تبي نحفظها؟"); return; }
+            JSONObject o=new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes");
+            speak("تمام، حفظت الملاحظة"); return;
         }
-        if (lower.startsWith("ذكرني") || lower.startsWith("اضف تذكير") || lower.startsWith("ضيف تذكير")) {
-            Matcher time = Pattern.compile("(?:الساعة\\s*)?(\\d{1,2})(?::(\\d{1,2}))?").matcher(command);
-            if (!time.find()) { speak("قولي وقت التذكير، مثلاً ذكرني غدوة الساعة تسعة بالاتصال"); return; }
-            int hour = Integer.parseInt(time.group(1)); int minute = time.group(2)==null?0:Integer.parseInt(time.group(2));
+
+        if (lower.matches(".*(?:ذكرني|فكرني|اضف تذكير|ضيف تذكير|ديرلي تذكير).*")) {
+            Matcher time=Pattern.compile("(?:الساعة\\\\s*)?(\\\\d{1,2})(?::(\\\\d{1,2}))?").matcher(lower);
+            if (!time.find()) { speak("ما سمعتش الوقت. قول مثلاً: ذكرني غدوة الساعة تسعة بالاتصال"); return; }
+            int hour=Integer.parseInt(time.group(1)), minute=time.group(2)==null?0:Integer.parseInt(time.group(2));
             if (hour>23 || minute>59) { speak("الوقت غير صحيح"); return; }
-            Calendar when = Calendar.getInstance();
-            if (lower.contains("غدوة") || lower.contains("بكرة") || lower.contains("غدا")) when.add(Calendar.DAY_OF_YEAR,1);
+            Calendar when=Calendar.getInstance();
+            boolean tomorrow=lower.contains("غدوة") || lower.contains("بكره") || lower.contains("بكرة") || lower.contains("غدا");
+            if (tomorrow) when.add(Calendar.DAY_OF_YEAR,1);
             when.set(Calendar.HOUR_OF_DAY,hour); when.set(Calendar.MINUTE,minute); when.set(Calendar.SECOND,0);
-            if (when.getTimeInMillis()<=System.currentTimeMillis() && !(lower.contains("غدوة")||lower.contains("بكرة")||lower.contains("غدا"))) when.add(Calendar.DAY_OF_YEAR,1);
-            String title = command.substring(0,time.start()).replaceAll("^(ذكرني|اضف تذكير|ضيف تذكير)\\s*", "").trim();
-            title = title.replaceAll("^(غدوة|بكرة|غدا)\\s*", "").trim();
-            String tail = command.substring(time.end()).replaceFirst("^\\s*(بال|ب|في)\\s*", "").trim();
-            if (!tail.isEmpty()) title = tail;
-            if (title.isEmpty()) title = "تذكير";
-            scheduleReminder(title,when); speak("تم ضبط التذكير " + title); return;
+            if (when.getTimeInMillis()<=System.currentTimeMillis() && !tomorrow) when.add(Calendar.DAY_OF_YEAR,1);
+            String title=lower.substring(time.end()).replaceFirst("^\\\\s*(?:بال|ب|في)\\\\s*", "").trim();
+            title=title.replaceFirst("^(?:الاتصال|اتصال|انك|اني)\\\\s*", "").trim();
+            if (title.isEmpty()) title="تذكير";
+            scheduleReminder(title,when); speak("تمام، ضبطت التذكير: " + title); return;
         }
-        speak("ما فهمتش الأمر. جرب: أضف مهمة، أضف ملاحظة، اعرض المهام، أو ذكرني غدوة الساعة تسعة");
+
+        speak("سمعتك تقول: " + command + ". لكن ما عرفتش نوع الأمر. تقدر تقول: نبي نضيف مهمة، ديرلي ملاحظة، وريني المهام، أو ذكرني الساعة تسعة.");
     }
 
     private void showTab(String tab) {
