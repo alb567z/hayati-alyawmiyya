@@ -371,9 +371,43 @@ public class MainActivity extends Activity {
         }
         if (lower.matches(".*(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب|دون|خزن).*ملاحظه.*")) {
             String body=lower.replaceFirst(".*?(?:اضف|ضيف|ديرلي|دير|نبي نضيف|نبي ندير|سجللي|سجل|اكتب|دون|خزن)?\\s*ملاحظه\\s*", "").trim();
-            if (body.isEmpty()) { speak("شن تبي نكتبلك في الملاحظة؟"); return; }
-            JSONObject o=new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",body); notes.put(o); saveData(); showTab("notes");
-            speak("تمام، خزّنتلك الملاحظة."); return;
+            boolean wantsReminder = body.matches(".*(?:ذكرني|فكرني|دكرني).*");
+            Calendar noteReminderTime = null;
+            String reminderTitle = body;
+            if (wantsReminder) {
+                Matcher noteTime=Pattern.compile("(?:ال)?ساعه\\s*(\\d{1,2})(?::(\\d{1,2}))?").matcher(body);
+                if (noteTime.find()) {
+                    int hour=Integer.parseInt(noteTime.group(1));
+                    int minute=noteTime.group(2)==null?0:Integer.parseInt(noteTime.group(2));
+                    if(hour<=23 && minute<=59) {
+                        noteReminderTime=Calendar.getInstance();
+                        boolean tomorrow=body.contains("غدوة") || body.contains("بكره") || body.contains("بكرة") || body.contains("غدا");
+                        if(tomorrow) noteReminderTime.add(Calendar.DAY_OF_YEAR,1);
+                        noteReminderTime.set(Calendar.HOUR_OF_DAY,hour);
+                        noteReminderTime.set(Calendar.MINUTE,minute);
+                        noteReminderTime.set(Calendar.SECOND,0);
+                        if(noteReminderTime.getTimeInMillis()<=System.currentTimeMillis() && !tomorrow) noteReminderTime.add(Calendar.DAY_OF_YEAR,1);
+                    }
+                    reminderTitle=body.substring(0,noteTime.start()).trim();
+                }
+                int marker=reminderTitle.indexOf("ذكرني");
+                if(marker<0) marker=reminderTitle.indexOf("فكرني");
+                if(marker<0) marker=reminderTitle.indexOf("دكرني");
+                if(marker>=0) reminderTitle=reminderTitle.substring(0,marker).trim();
+                reminderTitle=reminderTitle.replaceFirst("^(?:اني|ان|عندي)\\s*","").trim();
+            }
+            if (reminderTitle.isEmpty() && wantsReminder) reminderTitle="ملاحظة صوتية";
+            if (reminderTitle.isEmpty()) { speak("شن تبي نكتبلك في الملاحظة؟"); return; }
+            JSONObject o=new JSONObject(); put(o,"title","ملاحظة صوتية"); put(o,"body",reminderTitle);
+            if(noteReminderTime!=null) put(o,"reminderWhen",new SimpleDateFormat("yyyy/MM/dd  HH:mm",Locale.getDefault()).format(noteReminderTime.getTime()));
+            notes.put(o); saveData(); showTab("notes");
+            if(wantsReminder && noteReminderTime!=null) {
+                scheduleReminder("تذكير بالملاحظة: "+reminderTitle,noteReminderTime);
+                speak("تمام، حفظت الملاحظة وضبطتلك تذكير في الوقت اللي طلبته.");
+            } else if(wantsReminder) {
+                speak("حفظت الملاحظة، لكن ما سمعتش وقت التذكير. قولي مثلاً: الساعة خمسة.");
+            } else speak("تمام، خزّنتلك الملاحظة.");
+            return;
         }
 
         if (lower.matches(".*(?:ذكرني|فكرني|اضف تذكير|ضيف تذكير|ديرلي تذكير).*")) {
@@ -457,6 +491,7 @@ public class MainActivity extends Activity {
             final int index=i; JSONObject o=notes.optJSONObject(i); if(o==null)continue;
             LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
             box.addView(text(o.optString("title"),18,ink)); box.addView(text(o.optString("body"),15,Color.DKGRAY));
+            if(!o.optString("reminderWhen","").isEmpty()) box.addView(text("تذكير: "+o.optString("reminderWhen"),13,teal));
             LinearLayout actions=new LinearLayout(this);
             Button edit=new Button(this);edit.setText("تعديل");edit.setOnClickListener(v->editNote(index));
             Button del=new Button(this);del.setText("حذف");del.setOnClickListener(v->{notes.remove(index);saveData();showTab("notes");});
