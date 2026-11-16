@@ -194,8 +194,10 @@ public class MainActivity extends Activity {
             else {
                 String person=rest.substring(0,split).trim();
                 String body=rest.substring(split).replaceFirst("^\\s*نصها?\\s*","").trim();
-                requestContactAction(person,true);
-                pendingSmsBody=body;
+                pendingContactName=person; pendingSms=true; pendingSmsBody=body;
+                if(checkSelfPermission("android.permission.READ_CONTACTS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)
+                    requestPermissions(new String[]{"android.permission.READ_CONTACTS"},CONTACT_PERMISSION);
+                else performContactAction();
             }
             return;
         }
