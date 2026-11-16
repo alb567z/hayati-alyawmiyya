@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     private String pendingContactName = "";
     private boolean pendingSms = false;
     private String pendingSmsBody = "";
+    private String pendingCallNumber = "";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -141,21 +142,37 @@ public class MainActivity extends Activity {
                 i.putExtra("sms_body",pendingSmsBody); startActivity(i);
                 speak("فتحتلك الرسائل. راجعها، وبعدها اضغط إرسال.");
             } else {
-                if(checkSelfPermission("android.permission.CALL_PHONE")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{"android.permission.CALL_PHONE"},CALL_PERMISSION); return;
-                }
-                startActivity(new Intent(Intent.ACTION_CALL,Uri.parse("tel:"+Uri.encode(number))));
+                new AlertDialog.Builder(this)
+                    .setTitle("تأكيد الاتصال")
+                    .setMessage("هل تريد الاتصال بـ "+pendingContactName+"؟")
+                    .setNegativeButton("إلغاء",(dialog,which)->speak("تمام، ألغيت الاتصال."))
+                    .setPositiveButton("نعم، اتصل",(dialog,which)->initiateCall(number))
+                    .show();
+                speak("هل تريد الاتصال بـ "+pendingContactName+"؟");
             }
         } catch(Exception e) { toast("تعذر تنفيذ الطلب. تحقق من صلاحيات الهاتف."); }
     }
+    private void initiateCall(String number) {
+        pendingCallNumber=number;
+        if(checkSelfPermission("android.permission.CALL_PHONE")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.CALL_PHONE"},CALL_PERMISSION);
+            return;
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_CALL,Uri.parse("tel:"+Uri.encode(number))));
+        } catch(Exception e) {
+            toast("تعذر إجراء المكالمة. تحقق من صلاحيات الهاتف.");
+        }
+    }
+
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults) {
         super.onRequestPermissionsResult(requestCode,permissions,grantResults);
         if(requestCode==CONTACT_PERMISSION) {
             if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) performContactAction();
             else toast("لم يتم منح إذن جهات الاتصال.");
         } else if(requestCode==CALL_PERMISSION) {
-            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) performContactAction();
-            else toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف.");
+            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) initiateCall(pendingCallNumber);
+            else { pendingCallNumber=""; toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف."); }
         } else if(requestCode==72) {
             if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 toast("تم تفعيل الميكروفون. استمع الآن إلى أمرك.");
