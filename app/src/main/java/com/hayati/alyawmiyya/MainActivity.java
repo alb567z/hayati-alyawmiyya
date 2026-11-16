@@ -727,6 +727,12 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (lower.contains("شن عندي") && (lower.contains("غدوة") || lower.contains("بكره") || lower.contains("بكرة") || lower.contains("غدا"))
+                && !lower.contains("ملاحظ") && !lower.contains("موعد") && !lower.contains("مواعيد")) {
+            speakTomorrowOverview();
+            showTab("today");
+            return;
+        }
         if (lower.contains("ملاحظ") && (lower.contains("شن") || lower.contains("عندي") || lower.contains("اقرا") || lower.contains("اقرأ"))) {
             speakSavedItems("notes", false);
             showTab("notes");
@@ -832,6 +838,34 @@ public class MainActivity extends Activity {
         }
 
         speak("ما فهمتكش، عاود قولّي.");
+    }
+
+    private void speakTomorrowOverview() {
+        Calendar target = Calendar.getInstance();
+        target.add(Calendar.DAY_OF_YEAR, 1);
+        String date = new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()).format(target.getTime());
+        ArrayList<String> entries = new ArrayList<>();
+        for (int i = 0; i < tasks.length(); i++) {
+            JSONObject item = tasks.optJSONObject(i);
+            if (item != null && !item.optBoolean("done", false) && !item.optString("title", "").trim().isEmpty())
+                entries.add("مهمة: " + item.optString("title"));
+        }
+        for (int i = 0; i < reminders.length(); i++) {
+            JSONObject item = reminders.optJSONObject(i);
+            if (item == null) continue;
+            String when = item.optString("when", "");
+            if (when.startsWith(date)) entries.add("موعد: " + item.optString("title") + (when.length() >= 18 ? " الساعة " + when.substring(12).trim() : ""));
+        }
+        if (entries.isEmpty()) {
+            speak("ما عندكش مهام أو مواعيد مسجلة غدوة.");
+            return;
+        }
+        StringBuilder answer = new StringBuilder("غدوة عندك: ");
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) answer.append("، ");
+            answer.append(entries.get(i));
+        }
+        speak(answer.toString());
     }
 
     private void speakSavedItems(String key, boolean tomorrowOnly) {
