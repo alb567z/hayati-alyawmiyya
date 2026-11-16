@@ -808,6 +808,7 @@ public class MainActivity extends Activity {
         card(text("الملاحظات: "+notes.length(),17,ink));
         content.addView(button("＋ إضافة مهمة",()->addTask()));
         content.addView(button("＋ إضافة تذكير",()->pickReminder()));
+        content.addView(button("📞 موعد عمل — اتصال وارد من نسرين",()->pickWorkAppointment()));
         content.addView(button("＋ كتابة ملاحظة",()->addNote()));
         content.addView(text("مهام اليوم",18,ink));
         boolean any=false;
@@ -872,6 +873,7 @@ public class MainActivity extends Activity {
     private void showReminders() {
         heading("تذكيراتي", "حدد التاريخ والوقت وسينبهك الهاتف");
         content.addView(button("＋ تذكير جديد",()->pickReminder()));
+        content.addView(button("📞 موعد عمل — اتصال وارد من نسرين",()->pickWorkAppointment()));
         for(int i=0;i<reminders.length();i++){
             final int index=i;JSONObject o=reminders.optJSONObject(i);if(o==null)continue;
             LinearLayout line=new LinearLayout(this);line.setOrientation(LinearLayout.VERTICAL);
@@ -892,14 +894,27 @@ public class MainActivity extends Activity {
                 inputDialog("عنوان التذكير","مثلاً: الاتصال بعبدالباري",title->scheduleReminder(title,chosen));
             },c.get(Calendar.HOUR_OF_DAY),c.get(Calendar.MINUTE),true).show();        },c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();
     }
-    private void scheduleReminder(String title,Calendar when) {
+    private void pickWorkAppointment() {
+        Calendar now=Calendar.getInstance();
+        new DatePickerDialog(this,(view,y,m,day)->{
+            Calendar chosen=Calendar.getInstance();chosen.set(y,m,day);
+            new TimePickerDialog(this,(tv,hour,minute)->{
+                chosen.set(Calendar.HOUR_OF_DAY,hour);chosen.set(Calendar.MINUTE,minute);chosen.set(Calendar.SECOND,0);
+                if(chosen.getTimeInMillis()<=System.currentTimeMillis()){toast("اختَر وقتاً في المستقبل");return;}
+                inputDialog("عنوان موعد العمل","مثلاً: موعد تركيب الساعة 9",title->scheduleReminder(title,chosen,"work"));
+            },now.get(Calendar.HOUR_OF_DAY),now.get(Calendar.MINUTE),true).show();
+        },now.get(Calendar.YEAR),now.get(Calendar.MONTH),now.get(Calendar.DAY_OF_MONTH)).show();
+    }
+    private void scheduleReminder(String title,Calendar when) { scheduleReminder(title,when,"reminder"); }
+    private void scheduleReminder(String title,Calendar when,String type) {
         int id=(int)(System.currentTimeMillis() & 0x7fffffff);
-        Intent intent=new Intent(this,ReminderReceiver.class);intent.putExtra("title",title);intent.putExtra("id",id);
+        Intent intent=new Intent(this,ReminderReceiver.class);intent.putExtra("title",title);intent.putExtra("id",id);intent.putExtra("type",type);
         PendingIntent pi=PendingIntent.getBroadcast(this,id,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         AlarmManager am=(AlarmManager)getSystemService(ALARM_SERVICE);
         if(am!=null){if(Build.VERSION.SDK_INT>=23)am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);else am.set(AlarmManager.RTC_WAKEUP,when.getTimeInMillis(),pi);}
         String label=new SimpleDateFormat("yyyy/MM/dd  HH:mm",Locale.getDefault()).format(when.getTime());
-        JSONObject o=new JSONObject();put(o,"id",id);put(o,"title",title);put(o,"when",label);reminders.put(o);saveData();showTab("reminders");toast("تم حفظ التذكير");
+        JSONObject o=new JSONObject();put(o,"id",id);put(o,"title",title);put(o,"when",label);put(o,"type",type);reminders.put(o);saveData();showTab("reminders");
+        toast("work".equals(type)?"تم حفظ موعد العمل؛ سيصلك اتصال من نسرين":"تم حفظ التذكير");
     }
     private void cancelReminder(int id) {
         Intent intent=new Intent(this,ReminderReceiver.class);
