@@ -12,6 +12,7 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.InputType;
 import android.view.*;
 import android.widget.*;
@@ -38,6 +39,7 @@ public class MainActivity extends Activity {
     private boolean pendingSms = false;
     private String pendingSmsBody = "";
     private String pendingCallNumber = "";
+    private boolean awaitingCallConfirmation = false;
     private MediaRecorder enrollmentRecorder;
     private AlertDialog enrollmentDialog;
     private TextView enrollmentStatus;
@@ -210,13 +212,13 @@ public class MainActivity extends Activity {
                 i.putExtra("sms_body",pendingSmsBody); startActivity(i);
                 speak("فتحتلك الرسائل. راجعها، وبعدها اضغط إرسال.");
             } else {
-                new AlertDialog.Builder(this)
-                    .setTitle("تأكيد الاتصال")
-                    .setMessage("هل تريد الاتصال بـ "+pendingContactName+"؟")
-                    .setNegativeButton("إلغاء",(dialog,which)->speak("تمام، ألغيت الاتصال."))
-                    .setPositiveButton("نعم، اتصل",(dialog,which)->initiateCall(number))
-                    .show();
-                speak("هل تريد الاتصال بـ "+pendingContactName+"؟");
+                pendingCallNumber = number;
+                awaitingCallConfirmation = true;
+                speak("هل تريد الاتصال بـ "+pendingContactName+"؟ قل نعم اتصل أو لا ألغي.");
+                // Open speech recognition after the spoken confirmation prompt finishes.
+                new Handler(getMainLooper()).postDelayed(() -> {
+                    if (awaitingCallConfirmation && !isFinishing()) startVoiceInput();
+                }, 2300);
             }
         } catch(Exception e) { toast("تعذر تنفيذ الطلب. تحقق من صلاحيات الهاتف."); }
     }
@@ -398,8 +400,15 @@ public class MainActivity extends Activity {
         if (requestCode == VOICE_REQUEST) {
             if (resultCode == RESULT_OK && data != null) {
                 ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                if (results != null && !results.isEmpty()) handleVoiceCommand(results.get(0));
-                else speak("ما سمعتكش كويس، عاود قولّي.");
+                if (results != null && !results.isEmpty()) {
+                    String recognized = results.get(0);
+                    if (awaitingCallConfirmation) handleCallConfirmationVoice(recognized);
+                    else handleVoiceCommand(recognized);
+                } else if (awaitingCallConfirmation) {
+                    awaitingCallConfirmation = false;
+                    pendingCallNumber = "";
+                    speak("ما سمعتش التأكيد، ما درتش الاتصال.");
+                } else speak("ما سمعتكش كويس، عاود قولّي.");
             } else if (resultCode == RESULT_CANCELED) {
                 toast("لم يتم تسجيل أمر. اضغط الميكروفون وتحدث بعد سماع النغمة.");
             }
@@ -539,6 +548,28 @@ public class MainActivity extends Activity {
             } else speak("ما لقيتش التذكير المطلوب.");
         }
         return true;
+    }
+
+    private void handleCallConfirmationVoice(String raw) {
+        String answer = normalizeVoiceText(cleanVoice(raw));
+        boolean yes = answer.matches(".*(?:^|\\s)(?:نعم|اي|ايوه|أيوه|ايوا)(?:\\s|$).*")
+            || answer.contains("نعم اتصل") || answer.contains("اي اتصل") || answer.contains("ايوه اتصل");
+        boolean no = answer.matches(".*(?:^|\\s)(?:لا|الغاء|الغي|إلغاء)(?:\\s|$).*");
+        if (yes && !pendingCallNumber.isEmpty()) {
+            String number = pendingCallNumber;
+            awaitingCallConfirmation = false;
+            pendingCallNumber = "";
+            speak("تمام، جاري الاتصال.");
+            initiateCall(number);
+        } else if (no) {
+            awaitingCallConfirmation = false;
+            pendingCallNumber = "";
+            speak("تمام، ألغيت الاتصال.");
+        } else {
+            awaitingCallConfirmation = false;
+            pendingCallNumber = "";
+            speak("ما وصلنيش تأكيد واضح، ألغيت الاتصال حفاظاً على أمانك.");
+        }
     }
 
     private void handleVoiceCommand(String raw) {
