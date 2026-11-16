@@ -96,6 +96,22 @@ public class MainActivity extends Activity {
         voice.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("voice_enabled",on).apply()); card(voice);
         Switch assistant=new Switch(this); assistant.setText("تشغيل الأوامر الصوتية بالميكروفون"); assistant.setTextSize(17); assistant.setChecked(p.getBoolean("assistant_enabled",true));
         assistant.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("assistant_enabled",on).apply()); card(assistant);
+        Switch wake=new Switch(this);
+        wake.setText("الاستماع في الخلفية لعبارة: يا صاحبي");
+        wake.setTextSize(17);
+        wake.setChecked(p.getBoolean("wake_listening_enabled",false));
+        wake.setOnCheckedChangeListener((v,on)->{
+            if(on && checkSelfPermission("android.permission.RECORD_AUDIO")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{"android.permission.RECORD_AUDIO"},705);
+                wake.setChecked(false);
+                return;
+            }
+            p.edit().putBoolean("wake_listening_enabled",on).apply();
+            if(on) { startWakeWordService(); toast("بدأ الاستماع وسيظهر إشعار دائم."); }
+            else { stopWakeWordService(); toast("تم إيقاف الاستماع."); }
+        });
+        card(wake);
+        card(text("قل يا صاحبي، وبعد الرد نعم يا صاحبي اسأله عن الساعة أو الإشعارات. يعتمد التعرف على خدمة الصوت في الهاتف وقد يحتاج إنترنت، وقد لا يستمر على كل الأجهزة عند قفل الشاشة.",14,Color.GRAY));
         Switch calls=new Switch(this); calls.setText("السماح بميزة الاتصال"); calls.setTextSize(17); calls.setChecked(p.getBoolean("calls_enabled",true));
         calls.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("calls_enabled",on).apply()); card(calls);
         Switch sms=new Switch(this); sms.setText("السماح بميزة الرسائل"); sms.setTextSize(17); sms.setChecked(p.getBoolean("sms_enabled",true));
@@ -117,6 +133,17 @@ public class MainActivity extends Activity {
         content.addView(button("⚙️ إعدادات التطبيق في الهاتف",()->openAppSettings()));
         card(text("الاتصال: عند قول «اتصل بـ + اسم الشخص» سيبحث التطبيق في جهات الاتصال، ثم يبدأ الاتصال بعد منح الإذن. الرسائل تفتح شاشة الرسائل لتراجعها وترسلها بنفسك.",14,Color.GRAY));
         card(text("استشعار الحركة يعمل كخيار داخل التطبيق فقط حالياً. تشغيل التطبيق تلقائياً وهو مغلق بسبب الحركة يحتاج خدمة خلفية دائمة وقد يستهلك البطارية، لذلك لم أفعّله دون موافقتك.",14,Color.GRAY));
+    }
+    private void startWakeWordService() {
+        Intent i=new Intent(this,WakeWordService.class);
+        i.setAction(WakeWordService.ACTION_START);
+        try { if(Build.VERSION.SDK_INT>=26) startForegroundService(i); else startService(i); }
+        catch(Exception e) { toast("تعذر تشغيل الاستماع. افتح التطبيق وحاول مجدداً."); }
+    }
+    private void stopWakeWordService() {
+        Intent i=new Intent(this,WakeWordService.class);
+        i.setAction(WakeWordService.ACTION_STOP);
+        try { startService(i); } catch(Exception ignored) {}
     }
     private void openPermissionSettings(String permission) {
         openAppSettings();
@@ -186,6 +213,15 @@ public class MainActivity extends Activity {
         } else if(requestCode==CALL_PERMISSION) {
             if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) initiateCall(pendingCallNumber);
             else { pendingCallNumber=""; toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف."); }
+        } else if(requestCode==705) {
+            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                getSharedPreferences(PREFS,MODE_PRIVATE).edit().putBoolean("wake_listening_enabled",true).apply();
+                startWakeWordService();
+                toast("تم السماح بالميكروفون وتشغيل الاستماع.");
+            } else {
+                toast("يلزم السماح بالميكروفون لتشغيل الاستماع.");
+            }
+            showTab("settings");
         } else if(requestCode==72) {
             if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 toast("تم تفعيل الميكروفون. استمع الآن إلى أمرك.");
