@@ -144,6 +144,15 @@ public class WakeWordService extends Service {
     private void applyVoiceSettings() {
         if (tts == null) return;
         android.content.SharedPreferences prefs = getSharedPreferences("hayati_data",MODE_PRIVATE);
+        String voiceName=prefs.getString("voice_name","");
+        if (!voiceName.isEmpty() && tts.getVoices()!=null) {
+            for (Voice voice : tts.getVoices()) {
+                if (voice!=null && voiceName.equals(voice.getName())) {
+                    try { tts.setVoice(voice); } catch(Exception ignored) {}
+                    break;
+                }
+            }
+        }
         float pitch = prefs.getFloat("voice_pitch",1.0f);
         tts.setPitch(pitch);
         tts.setSpeechRate(1.0f);
