@@ -2,6 +2,9 @@ package com.hayati.alyawmiyya;
 
 import android.app.*;
 import android.content.*;
+import android.net.Uri;
+import android.database.Cursor;
+import android.provider.ContactsContract;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -27,6 +30,9 @@ public class MainActivity extends Activity {
     private JSONArray tasks, notes, reminders;
     private TextToSpeech tts;
     private static final int VOICE_REQUEST = 702;
+    private static final int CONTACT_PERMISSION = 703, CALL_PERMISSION = 704;
+    private String pendingContactName = "";
+    private boolean pendingSms = false;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -65,11 +71,75 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this); content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(16,16,16,22);
         scroll.addView(content); root.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
         nav = new LinearLayout(this); nav.setPadding(4,8,4,8); nav.setBackgroundColor(Color.WHITE); root.addView(nav);
-        addNav("today","اليوم"); addNav("tasks","المهام"); addNav("reminders","التذكيرات"); addNav("notes","الملاحظات");
+        addNav("today","اليوم"); addNav("tasks","المهام"); addNav("reminders","التذكيرات"); addNav("notes","الملاحظات"); addNav("settings","الإعدادات");
     }
     private void addNav(String id, String label) {
         Button b = new Button(this); b.setText(label); b.setTextSize(12); b.setAllCaps(false);
         b.setOnClickListener(v -> showTab(id)); nav.addView(b,new LinearLayout.LayoutParams(0,54,1));
+    }
+    private void showSettings() {
+        heading("الإعدادات", "تحكم في صلاحيات وميزات حياتي اليومية");
+        android.content.SharedPreferences p=getSharedPreferences(PREFS,MODE_PRIVATE);
+        Switch voice=new Switch(this); voice.setText("الردود الصوتية"); voice.setTextSize(17); voice.setChecked(p.getBoolean("voice_enabled",true));
+        voice.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("voice_enabled",on).apply()); card(voice);
+        Switch motion=new Switch(this); motion.setText("استشعار حركة الهاتف أثناء فتح التطبيق"); motion.setTextSize(16); motion.setChecked(p.getBoolean("motion_enabled",false));
+        motion.setOnCheckedChangeListener((v,on)->p.edit().putBoolean("motion_enabled",on).apply()); card(motion);
+        content.addView(button("🎙️ إعداد إذن الميكروفون",()->openAppSettings()));
+        content.addView(button("🔔 إعدادات الإشعارات",()->{ Intent i=new Intent(); if(Build.VERSION.SDK_INT>=26){i.setAction("android.settings.APP_NOTIFICATION_SETTINGS");i.putExtra("android.provider.extra.APP_PACKAGE",getPackageName());}else{i.setAction("android.settings.APPLICATION_DETAILS_SETTINGS");i.setData(Uri.parse("package:"+getPackageName()));} startActivity(i); }));
+        content.addView(button("🔐 الخصوصية والصلاحيات",()->new AlertDialog.Builder(this).setTitle("الخصوصية").setMessage("المهام والملاحظات والتذكيرات محفوظة محلياً على هاتفك. جهات الاتصال لا تُستخدم إلا عند طلب الاتصال أو الرسالة. يمكنك سحب أي إذن من إعدادات الهاتف في أي وقت.").setPositiveButton("حسناً",null).show()));
+        content.addView(button("⚙️ إعدادات التطبيق في الهاتف",()->openAppSettings()));
+        card(text("الاتصال: عند قول «اتصل بـ + اسم الشخص» سيبحث التطبيق في جهات الاتصال، ثم يبدأ الاتصال بعد منح الإذن. الرسائل تفتح شاشة الرسائل لتراجعها وترسلها بنفسك.",14,Color.GRAY));
+        card(text("استشعار الحركة يعمل كخيار داخل التطبيق فقط حالياً. تشغيل التطبيق تلقائياً وهو مغلق بسبب الحركة يحتاج خدمة خلفية دائمة وقد يستهلك البطارية، لذلك لم أفعّله دون موافقتك.",14,Color.GRAY));
+    }
+    private void openAppSettings() {
+        Intent i=new Intent("android.settings.APPLICATION_DETAILS_SETTINGS",Uri.parse("package:"+getPackageName())); startActivity(i);
+    }
+    private String findPhone(String wanted) {
+        if(checkSelfPermission("android.permission.READ_CONTACTS")!=android.content.pm.PackageManager.PERMISSION_GRANTED) return null;
+        Cursor cur=null;
+        try {
+            cur=getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                new String[]{ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,ContactsContract.CommonDataKinds.Phone.NUMBER},null,null,null);
+            if(cur!=null) while(cur.moveToNext()) {
+                String name=cur.getString(0), number=cur.getString(1);
+                if(name!=null && normalizeName(name).contains(normalizeName(wanted))) return number;
+            }
+        } catch(Exception ignored) {} finally { if(cur!=null)cur.close(); }
+        return null;
+    }
+    private String normalizeName(String s) { return s==null?"":s.replace("أ","ا").replace("إ","ا").replace("آ","ا").replace("ـ","").replace(" ","").toLowerCase(Locale.ROOT); }
+    private void requestContactAction(String name, boolean sms) {
+        pendingContactName=name; pendingSms=sms;
+        if(checkSelfPermission("android.permission.READ_CONTACTS")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.READ_CONTACTS"},CONTACT_PERMISSION); return;
+        }
+        performContactAction();
+    }
+    private void performContactAction() {
+        String number=findPhone(pendingContactName);
+        if(number==null) { speak("لم أجد هذا الاسم في جهات الاتصال. تأكد من الاسم أو أضف الرقم إلى الهاتف."); return; }
+        try {
+            if(pendingSms) {
+                Intent i=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+Uri.encode(number)));
+                i.putExtra("sms_body",""); startActivity(i);
+                speak("فتحت الرسائل. اكتب رسالتك وراجعها ثم اضغط إرسال.");
+            } else {
+                if(checkSelfPermission("android.permission.CALL_PHONE")!=android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{"android.permission.CALL_PHONE"},CALL_PERMISSION); return;
+                }
+                startActivity(new Intent(Intent.ACTION_CALL,Uri.parse("tel:"+Uri.encode(number))));
+            }
+        } catch(Exception e) { toast("تعذر تنفيذ الطلب. تحقق من صلاحيات الهاتف."); }
+    }
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode==CONTACT_PERMISSION) {
+            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) performContactAction();
+            else toast("لم يتم منح إذن جهات الاتصال.");
+        } else if(requestCode==CALL_PERMISSION) {
+            if(grantResults.length>0 && grantResults[0]==android.content.pm.PackageManager.PERMISSION_GRANTED) performContactAction();
+            else toast("لم يتم منح إذن الاتصال. يمكنك تفعيله من إعدادات الهاتف.");
+        }
     }
     private void startVoiceInput() {
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission("android.permission.RECORD_AUDIO") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -99,7 +169,7 @@ public class MainActivity extends Activity {
 
     private void speak(String message) {
         toast(message);
-        if (tts != null) tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "hayati_voice");
+        if (tts != null && getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean("voice_enabled",true)) tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "hayati_voice");
     }
 
     private String cleanVoice(String value) {
@@ -109,6 +179,19 @@ public class MainActivity extends Activity {
     private void handleVoiceCommand(String raw) {
         String command = cleanVoice(raw);
         String lower = command.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("اتصل") || lower.startsWith("كلم")) {
+            String person=command.replaceFirst("^(اتصل|كلم)\\s*(ب|على|مع)?\\s*","").trim();
+            if(person.isEmpty()) speak("قولي اسم الشخص، مثلاً اتصل بعبد الباري");
+            else requestContactAction(person,false);
+            return;
+        }
+        if (lower.startsWith("ابعث رسالة") || lower.startsWith("أرسل رسالة") || lower.startsWith("ارسل رسالة")) {
+            String rest=command.replaceFirst("^(ابعث|أرسل|ارسل)\\s*رسالة\\s*(إلى|الى|ل)?\\s*","").trim();
+            int split=rest.indexOf(" ");
+            if(split<1) speak("قولي: ابعث رسالة إلى الاسم ثم نص الرسالة");
+            else requestContactAction(rest.substring(0,split).trim(),true);
+            return;
+        }
         if (lower.startsWith("افتح ") || lower.startsWith("اعرض ") || lower.startsWith("وريني ")) {
             if (lower.contains("مهم")) { showTab("tasks"); speak("هذه قائمة المهام"); return; }
             if (lower.contains("ملاحظ")) { showTab("notes"); speak("هذه ملاحظاتك"); return; }
